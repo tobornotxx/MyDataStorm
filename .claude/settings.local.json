@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ':*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(gh auth:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m 'DataSTORM reproduction with bug fixes:*)",
+      "Bash(git bundle:*)"
+    ]
+  }
+}

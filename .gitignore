@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+*.log
+datastorm_report.md
+datastorm_report.json
