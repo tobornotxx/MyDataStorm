@@ -141,7 +141,7 @@ class WarmStartModule:
             f"Generate 3-5 diverse web search queries to research the following topic from "
             f"different angles. Output one query per line.\n\nTopic: {topic}"
         )
-        response = self._llm.generate(prompt, temperature=0.7, max_completion_tokens = 32768)
+        response = self._llm.generate(prompt, temperature=0.7, max_completion_tokens=32768)
         queries = [
             line.strip().lstrip("0123456789.-) ")
             for line in response.strip().split("\n")

@@ -23,8 +23,8 @@ class LLMConfig:
 
     api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     # 论文: gpt-5-2025-08-07 for exploration, gpt-5.1-2025-11-13 for report
-    exploration_model: str = "gpt-4o"
-    report_model: str = "gpt-4o"
+    exploration_model: str = "gpt-5.4-mini"
+    report_model: str = "gpt-5.4-mini"
     temperature: float = 0.7
     max_completion_tokens: int = 4096
 

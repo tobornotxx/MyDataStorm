@@ -180,26 +180,49 @@ class ExecutorAgent:
         action_name = ""
         action_args = ""
 
-        # 提取 Thought
-        thought_match = re.search(r"Thought:\s*(.*?)(?=Action:|$)", response, re.DOTALL)
+        # 清洗 markdown 包裹（``` 代码块、**bold** 等）
+        cleaned = response
+        # 去掉可能的 ``` 代码块包裹
+        for tag in ("```", "```markdown", "```text", "```plaintext"):
+            if cleaned.startswith(tag):
+                cleaned = cleaned[len(tag):]
+            if cleaned.rstrip().endswith("```"):
+                cleaned = cleaned.rstrip()[:-3]
+        cleaned = cleaned.strip()
+
+        # 去掉可能的 **bold** 包裹 (e.g., **Thought:** / **Action:**)
+        cleaned = re.sub(r"\*\*(Thought|Action)\*\*:", r"\1:", cleaned)
+
+        # 提取 Thought (支持 Thought: / thought: / **Thought:** 等变体)
+        thought_match = re.search(
+            r"[Tt]hought\s*:\s*(.*?)(?=[Aa]ction\s*:|$)", cleaned, re.DOTALL
+        )
         if thought_match:
             thought = thought_match.group(1).strip()
 
-        # 提取 Action — 从末尾匹配最外层括号
+        # 提取 Action — 匹配 Action: name(args) 或 Action: name
         action_match = re.search(
-            r"Action:\s*(\w+)\((.+)\)\s*$", response, re.DOTALL
+            r"[Aa]ction\s*:\s*(\w+)\s*\((.*)\)\s*$", cleaned, re.DOTALL
         )
+        if not action_match:
+            action_match = re.search(
+                r"[Aa]ction\s*:\s*(\w+)\s*\((.*)\)", cleaned, re.DOTALL
+            )
+        if not action_match:
+            action_match = re.search(
+                r"[Aa]ction\s*:\s*(\w+)\s*$", cleaned, re.DOTALL
+            )
+
         if action_match:
             action_name = action_match.group(1).strip()
-            action_args = action_match.group(2).strip()
-        else:
-            # 尝试其他格式
-            action_match = re.search(
-                r"Action:\s*(\w+)\((.+)\)", response, re.DOTALL
-            )
-            if action_match:
-                action_name = action_match.group(1).strip()
+            if action_match.lastindex and action_match.lastindex >= 2:
                 action_args = action_match.group(2).strip()
+
+        if not action_name:
+            logger.error(
+                "Executor: failed to parse action. Raw response:\n%s",
+                response[:800],
+            )
 
         return thought, action_name, action_args
 
