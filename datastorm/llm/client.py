@@ -33,7 +33,7 @@ class LLMClient:
         model: str | None = None,
         system_prompt: str | None = None,
         temperature: float | None = None,
-        max_tokens: int | None = None,
+        max_completion_tokens: int | None = None,
         json_mode: bool = False,
         max_retries: int = 3,
     ) -> str:
@@ -44,7 +44,7 @@ class LLMClient:
             model: 模型名称, 默认使用 exploration_model
             system_prompt: 系统 prompt
             temperature: 温度
-            max_tokens: 最大 token 数
+            max_completion_tokens: 最大 token 数
             json_mode: 是否要求 JSON 输出
             max_retries: 最大重试次数
 
@@ -53,25 +53,34 @@ class LLMClient:
         """
         model = model or self._config.exploration_model
         temperature = temperature if temperature is not None else self._config.temperature
-        max_tokens = max_tokens or self._config.max_tokens
+        max_completion_tokens = max_completion_tokens or self._config.max_completion_tokens
 
         messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        # OpenAI 要求使用 json_object 模式时 messages 中必须包含 "json" 一词
+        if json_mode:
+            has_json_word = any("json" in m["content"].lower() for m in messages)
+            if not has_json_word:
+                if messages[0]["role"] == "system":
+                    messages[0]["content"] += "\nRespond in JSON format."
+                else:
+                    messages.insert(0, {"role": "system", "content": "Respond in JSON format."})
+
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_completion_tokens": max_completion_tokens,
         }
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
 
         logger.debug(
-            "LLM request: model=%s, temperature=%s, max_tokens=%s, json_mode=%s",
-            model, temperature, max_tokens, json_mode,
+            "LLM request: model=%s, temperature=%s, max_completion_tokens=%s, json_mode=%s",
+            model, temperature, max_completion_tokens, json_mode,
         )
         logger.debug("LLM prompt (%d chars):\n%s", len(prompt), prompt[:2000])
 
@@ -103,7 +112,7 @@ class LLMClient:
         model: str | None = None,
         system_prompt: str | None = None,
         temperature: float | None = None,
-        max_tokens: int | None = None,
+        max_completion_tokens: int | None = None,
         max_retries: int = 3,
     ) -> dict[str, Any]:
         """生成 JSON 输出。
@@ -116,7 +125,7 @@ class LLMClient:
             model=model,
             system_prompt=system_prompt,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
             json_mode=True,
             max_retries=max_retries,
         )

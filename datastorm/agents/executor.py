@@ -278,7 +278,7 @@ class ExecutorAgent:
             f"Provide a concise natural language answer summarizing the key findings. "
             f"Include specific numbers and patterns discovered."
         )
-        return self._llm.generate(prompt, temperature=0.3, max_tokens=1024)
+        return self._llm.generate(prompt, temperature=0.3, max_completion_tokens=1024)
 
     def reset_history(self) -> None:
         """重置对话历史。"""

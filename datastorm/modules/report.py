@@ -225,7 +225,7 @@ class ReportGenerator:
         )
 
         result = self._llm.generate_json(
-            prompt, model=self._config.llm.report_model, max_tokens=4096
+            prompt, model=self._config.llm.report_model, max_completion_tokens=4096
         )
 
         return DraftedSection(
@@ -316,7 +316,7 @@ class ReportGenerator:
         )
 
         result = self._llm.generate_json(
-            prompt, model=self._config.llm.report_model, max_tokens=4096
+            prompt, model=self._config.llm.report_model, max_completion_tokens=4096
         )
 
         return DraftedSection(
@@ -372,7 +372,7 @@ class ReportGenerator:
         )
 
         result = self._llm.generate_json(
-            prompt, model=self._config.llm.report_model, max_tokens=8192
+            prompt, model=self._config.llm.report_model, max_completion_tokens=8192
         )
 
         # 构建参考文献

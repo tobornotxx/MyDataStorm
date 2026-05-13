@@ -26,7 +26,7 @@ class LLMConfig:
     exploration_model: str = "gpt-4o"
     report_model: str = "gpt-4o"
     temperature: float = 0.7
-    max_tokens: int = 4096
+    max_completion_tokens: int = 4096
 
 
 @dataclass

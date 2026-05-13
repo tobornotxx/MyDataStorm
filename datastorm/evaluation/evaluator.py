@@ -242,7 +242,7 @@ class DataSTORMEvaluator:
             answer=answer,
             gt_answer=gt_answer,
         )
-        response = self._llm.generate(prompt, temperature=0.0, max_tokens=64)
+        response = self._llm.generate(prompt, temperature=0.0, max_completion_tokens=64)
 
         match = re.search(r"<rating>(\d+)</rating>", response)
         if match:
