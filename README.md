@@ -30,7 +30,9 @@ datastorm/
 │   └── report.py         # 阶段3: 报告生成流水线
 ├── evaluation/
 │   └── evaluator.py      # 评估模块
-└── pipeline.py           # DataSTORM 主流水线
+├── pipeline.py           # DataSTORM 主流水线
+├── llm_config.example.json  # LLM 配置文件模板
+└── llm_config.json           # 实际配置（已被 .gitignore 排除）
 
 main.py                   # 程序入口
 ```
@@ -45,6 +47,20 @@ main.py                   # 程序入口
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env  # 配置 API keys
+
+# 配置 LLM（三选一，优先级由低到高）
+# 方式1: 复制模板并编辑
+cp datastorm/llm_config.example.json datastorm/llm_config.json
+# 编辑 llm_config.json，填入 api_base / api_key / model_name
+
+# 方式2: 环境变量
+set OPENAI_API_KEY=sk-...
+set OPENAI_API_BASE=https://your-proxy.com/v1
+
+# 方式3: CLI 参数（仅 run_on_benchmark 入口）
+python ../Report Generation/run_on_benchmark/datastorm_adapter/run_benchmark.py \
+    --model_name gpt-5.4-mini --api_base https://your-proxy.com/v1
+
+# 运行（PostgreSQL 模式）
 python main.py --query "Your research query" --db-url "postgresql://..." 
 ```

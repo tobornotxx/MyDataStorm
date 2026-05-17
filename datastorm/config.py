@@ -5,28 +5,75 @@
 - 第一层 n = 2 个查询, 后续层 n = 5 个查询
 - Executor 最多 15 轮 ReAct 循环
 - 论点每 p 层生成/精炼一次
+
+LLM 配置优先级（由低到高）:
+    1. datastorm/llm_config.json   ← 全局默认
+    2. 环境变量 (OPENAI_API_KEY, OPENAI_API_BASE)
+    3. 代码中显式传入的参数         ← 最终覆盖
 """
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# ── 加载全局 LLM 配置文件 ─────────────────────────────────────────────
+_CFG_PATH = Path(__file__).parent / "llm_config.json"
+
+def _load_json_config() -> dict:
+    """加载 llm_config.json，文件不存在或解析失败返回空 dict。"""
+    try:
+        if _CFG_PATH.is_file():
+            return json.loads(_CFG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+_JSON_CFG: dict = _load_json_config()
+
+
+def _json_or_env(json_key: str, env_key: str, fallback: str = "") -> str:
+    """按「JSON 文件 → 环境变量」优先级读取字符串配置。"""
+    return os.getenv(env_key) or _JSON_CFG.get(json_key, "") or fallback
+
+
+def _json_or_fallback(json_key: str, fallback: str = "") -> str:
+    """从 JSON 文件读取，缺失时回退到 fallback。"""
+    return _JSON_CFG.get(json_key, "") or fallback
+
 
 @dataclass
 class LLMConfig:
-    """LLM 调用配置。"""
+    """LLM 调用配置。
 
-    api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
-    # 论文: gpt-5-2025-08-07 for exploration, gpt-5.1-2025-11-13 for report
-    exploration_model: str = "gpt-5.4-mini"
-    report_model: str = "gpt-5.4-mini"
-    temperature: float = 0.7
-    max_completion_tokens: int = 4096
+    api_base / api_key / model_name 的默认值由 llm_config.json 统一管理，
+    环境变量 (OPENAI_API_KEY / OPENAI_API_BASE) 可覆盖 JSON 中的值。
+    """
+
+    api_key: str = field(
+        default_factory=lambda: _json_or_env("api_key", "OPENAI_API_KEY")
+    )
+    api_base: str = field(
+        default_factory=lambda: _json_or_env("api_base", "OPENAI_API_BASE")
+    )
+    exploration_model: str = field(
+        default_factory=lambda: _json_or_fallback("model_name", "gpt-5.4-mini")
+    )
+    report_model: str = field(
+        default_factory=lambda: _json_or_fallback("model_name", "gpt-5.4-mini")
+    )
+    temperature: float = field(
+        default_factory=lambda: _JSON_CFG.get("temperature", 0.7)
+    )
+    max_completion_tokens: int = field(
+        default_factory=lambda: int(_JSON_CFG.get("max_completion_tokens", 4096))
+    )
 
 
 @dataclass

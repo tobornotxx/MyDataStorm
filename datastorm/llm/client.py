@@ -25,7 +25,10 @@ class LLMClient:
 
     def __init__(self, config: LLMConfig) -> None:
         self._config = config
-        self._client = OpenAI(api_key=config.api_key)
+        kwargs = {"api_key": config.api_key}
+        if config.api_base:
+            kwargs["base_url"] = config.api_base
+        self._client = OpenAI(**kwargs)
 
     def generate(
         self,
