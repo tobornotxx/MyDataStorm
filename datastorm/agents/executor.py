@@ -76,6 +76,7 @@ class ExecutorAgent:
         last_sql = ""
         last_result_df = None
         full_question = f"{question}\n\nAdditional context: {context}" if context else question
+        consecutive_parse_errors = 0
 
         logger.debug("Executor starting: question=%r, max_turns=%d", question, max_turns)
 
@@ -113,10 +114,20 @@ class ExecutorAgent:
             )
 
             if not action_name:
-                logger.warning("Turn %d: Could not parse action from response", turn)
+                consecutive_parse_errors += 1
+                logger.warning(
+                    "Turn %d: Could not parse action from response (consecutive errors: %d)",
+                    turn, consecutive_parse_errors,
+                )
                 logger.debug("Turn %d: raw LLM response:\n%s", turn, response[:500])
                 action_history.append(f"Turn {turn}: [Parse Error] {response[:200]}")
+                # 连续解析失败 2 次则提前终止，避免浪费轮次
+                if consecutive_parse_errors >= 2:
+                    logger.warning("Executor: %d consecutive parse errors, terminating early", consecutive_parse_errors)
+                    break
                 continue
+            else:
+                consecutive_parse_errors = 0
 
             # 执行动作
             observation, executed_sql, result_df = self._execute_action(action_name, action_args)

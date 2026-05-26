@@ -93,37 +93,41 @@ class ReportGenerator:
             )
         logger.info("Stage B complete: %d sections drafted", len(drafted_sections))
 
-        # Stage C: 引用验证 (Prompt 14)
-        all_criticisms: list[list[CitationCheck]] = []
-        for draft in drafted_sections:
-            criticisms = self._stage_c_citation_grounding(draft)
-            all_criticisms.append(criticisms)
-            failed = sum(1 for c in criticisms if not c.is_entailed)
-            logger.info(
-                "Stage C: Section %s — %d/%d citations failed",
-                draft.section_id, failed, len(criticisms),
-            )
-            if failed:
-                logger.debug(
-                    "Stage C: Section %s failed sentences: %s",
-                    draft.section_id,
-                    [(c.sentence[:60], c.issue[:80]) for c in criticisms if not c.is_entailed],
+        # Stage C: 引用验证 (Prompt 14) — 可通过配置跳过
+        if self._config.report.skip_citation_check:
+            logger.info("Stage C/D skipped (skip_citation_check=True)")
+            revised_sections = drafted_sections
+        else:
+            all_criticisms: list[list[CitationCheck]] = []
+            for draft in drafted_sections:
+                criticisms = self._stage_c_citation_grounding(draft)
+                all_criticisms.append(criticisms)
+                failed = sum(1 for c in criticisms if not c.is_entailed)
+                logger.info(
+                    "Stage C: Section %s — %d/%d citations failed",
+                    draft.section_id, failed, len(criticisms),
                 )
+                if failed:
+                    logger.debug(
+                        "Stage C: Section %s failed sentences: %s",
+                        draft.section_id,
+                        [(c.sentence[:60], c.issue[:80]) for c in criticisms if not c.is_entailed],
+                    )
 
-        # Stage D: 章节修订 (Prompt 15)
-        revised_sections = []
-        for i, (draft, criticisms) in enumerate(zip(drafted_sections, all_criticisms)):
-            failed_checks = [c for c in criticisms if not c.is_entailed]
-            if failed_checks:
-                section_spec = outline.sections[i]
-                web_context = self._fetch_web_context(section_spec.web_queries)
-                revised = self._stage_d_revision(
-                    topic, thesis, title_package, section_spec, draft, failed_checks, web_context
-                )
-                revised_sections.append(revised)
-            else:
-                revised_sections.append(draft)
-        logger.info("Stage D complete: sections revised")
+            # Stage D: 章节修订 (Prompt 15)
+            revised_sections = []
+            for i, (draft, criticisms) in enumerate(zip(drafted_sections, all_criticisms)):
+                failed_checks = [c for c in criticisms if not c.is_entailed]
+                if failed_checks:
+                    section_spec = outline.sections[i]
+                    web_context = self._fetch_web_context(section_spec.web_queries)
+                    revised = self._stage_d_revision(
+                        topic, thesis, title_package, section_spec, draft, failed_checks, web_context
+                    )
+                    revised_sections.append(revised)
+                else:
+                    revised_sections.append(draft)
+            logger.info("Stage D complete: sections revised")
 
         # Stage E: 最终润色 (Prompt 16)
         report = self._stage_e_polish(

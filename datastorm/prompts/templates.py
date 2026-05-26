@@ -741,7 +741,18 @@ process:
   final SQL query.
 - Only the latest plot will be shown to you.
 
+IMPORTANT: BE EFFICIENT. You have a LIMITED number of turns. Once you have obtained a SQL result that
+answers the question, call stop() IMMEDIATELY. Do not run additional exploratory queries or refinements
+unless the current result is clearly wrong or incomplete. The goal is to answer the question with the
+minimum number of actions necessary.
+
 Form exactly one "Thought" and perform exactly one "Action", then wait for the "Observation".
+
+The required output format is EXACTLY:
+Thought: <your reasoning>
+Action: <action_name>(<arguments>)
+
+Do NOT wrap your response in markdown code blocks or add any other formatting.
 
 Possible actions are:
 - get_tables(): Retrieves all the tables with a corresponding short description. **You should use this action
@@ -755,8 +766,8 @@ Possible actions are:
   can reference the results of the SQL query using the `sql_results` variable, which will be passed in as
   a pandas dataframe. The two codes should be wrapped in string quotes(") // Example:
   execute_python_from_sql("SELECT * FROM table1", "print(sql_results)")
-- stop(): Marks the last executed SQL query as the final answer and ends the process. You can directly use
-  this if user is not engaged in database-related conversation but instead just chit-chatting.
+- stop(): Marks the last executed SQL query as the final answer and ends the process. CALL THIS AS SOON AS
+  you have a satisfactory result. Do not continue exploring after you have the answer.
 
 # input
 {% if conversation_history %}

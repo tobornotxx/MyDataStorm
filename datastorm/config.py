@@ -123,6 +123,8 @@ class ReportConfig:
     total_target_words: int = 3000
     # 每个章节最多 web 查询数
     max_web_queries_per_section: int = 3
+    # 是否跳过引用验证 (Stage C) 和修订 (Stage D)，可显著减少 API 请求
+    skip_citation_check: bool = False
 
 
 @dataclass
