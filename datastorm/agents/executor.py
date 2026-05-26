@@ -184,6 +184,12 @@ class ExecutorAgent:
     def _parse_response(self, response: str) -> tuple[str, str, str]:
         """解析 LLM 响应中的 Thought 和 Action。
 
+        健壮处理各种 LLM 输出格式变体：
+        - Markdown 代码块包裹
+        - **bold** 标记
+        - 前置闲话文本
+        - 大小写不敏感
+
         Returns:
             (thought, action_name, action_args)
         """
@@ -194,15 +200,27 @@ class ExecutorAgent:
         # 清洗 markdown 包裹（``` 代码块、**bold** 等）
         cleaned = response
         # 去掉可能的 ``` 代码块包裹
-        for tag in ("```", "```markdown", "```text", "```plaintext"):
-            if cleaned.startswith(tag):
-                cleaned = cleaned[len(tag):]
-            if cleaned.rstrip().endswith("```"):
-                cleaned = cleaned.rstrip()[:-3]
+        code_block_match = re.search(
+            r"```(?:text|plaintext|markdown)?\s*\n?(.*?)```", cleaned, re.DOTALL
+        )
+        if code_block_match:
+            cleaned = code_block_match.group(1)
+        else:
+            for tag in ("```", "```markdown", "```text", "```plaintext"):
+                if cleaned.startswith(tag):
+                    cleaned = cleaned[len(tag):]
+                if cleaned.rstrip().endswith("```"):
+                    cleaned = cleaned.rstrip()[:-3]
         cleaned = cleaned.strip()
 
-        # 去掉可能的 **bold** 包裹 (e.g., **Thought:** / **Action:**)
-        cleaned = re.sub(r"\*\*(Thought|Action)\*\*:", r"\1:", cleaned)
+        # 去掉可能的 **bold** 包裹 (e.g., **Thought:** / **Action:** / **Thought**: )
+        # 处理两种常见变体: **Thought:** 和 **Thought**:
+        cleaned = re.sub(r"\*\*(Thought|Action):?\*\*:?\s*", r"\1: ", cleaned)
+
+        # 去掉 Thought 前面的闲话文本（如 "Sure, here's my response:\n\n"）
+        thought_start = re.search(r"[Tt]hought\s*:", cleaned)
+        if thought_start:
+            cleaned = cleaned[thought_start.start():]
 
         # 提取 Thought (支持 Thought: / thought: / **Thought:** 等变体)
         thought_match = re.search(
@@ -211,23 +229,56 @@ class ExecutorAgent:
         if thought_match:
             thought = thought_match.group(1).strip()
 
-        # 提取 Action — 匹配 Action: name(args) 或 Action: name
-        action_match = re.search(
-            r"[Aa]ction\s*:\s*(\w+)\s*\((.*)\)\s*$", cleaned, re.DOTALL
-        )
-        if not action_match:
-            action_match = re.search(
-                r"[Aa]ction\s*:\s*(\w+)\s*\((.*)\)", cleaned, re.DOTALL
-            )
-        if not action_match:
-            action_match = re.search(
-                r"[Aa]ction\s*:\s*(\w+)\s*$", cleaned, re.DOTALL
-            )
+        # 提取 Action 部分的文本
+        action_section = re.search(r"[Aa]ction\s*:\s*(.*)", cleaned, re.DOTALL)
+        if action_section:
+            action_text = action_section.group(1).strip()
 
-        if action_match:
-            action_name = action_match.group(1).strip()
-            if action_match.lastindex and action_match.lastindex >= 2:
-                action_args = action_match.group(2).strip()
+            # 解析 action_name 和 action_args
+            # 先尝试匹配 name(...) 格式，使用括号平衡来提取参数
+            name_match = re.match(r"(\w+)\s*\(", action_text)
+            if name_match:
+                action_name = name_match.group(1)
+                # 从括号开始，找到匹配的闭括号
+                paren_start = action_text.index("(")
+                depth = 0
+                end = paren_start
+                in_string = False
+                string_char = None
+                escape_next = False
+                for i in range(paren_start, len(action_text)):
+                    ch = action_text[i]
+                    if escape_next:
+                        escape_next = False
+                        continue
+                    if ch == "\\":
+                        escape_next = True
+                        continue
+                    if not in_string and ch in ('"', "'"):
+                        in_string = True
+                        string_char = ch
+                        continue
+                    if in_string and ch == string_char:
+                        in_string = False
+                        continue
+                    if not in_string:
+                        if ch == "(":
+                            depth += 1
+                        elif ch == ")":
+                            depth -= 1
+                            if depth == 0:
+                                end = i
+                                break
+                if end > paren_start:
+                    action_args = action_text[paren_start + 1:end].strip()
+                else:
+                    # 没找到匹配的闭括号，取到行尾
+                    action_args = action_text[paren_start + 1:].rstrip(")")
+            else:
+                # 没有括号，可能是 "stop" 没带括号
+                bare_match = re.match(r"(\w+)\s*$", action_text)
+                if bare_match:
+                    action_name = bare_match.group(1)
 
         if not action_name:
             logger.error(
