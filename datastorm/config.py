@@ -63,10 +63,10 @@ class LLMConfig:
         default_factory=lambda: _json_or_env("api_base", "OPENAI_API_BASE")
     )
     exploration_model: str = field(
-        default_factory=lambda: _json_or_fallback("model_name", "gpt-5.4-mini")
+        default_factory=lambda: _json_or_fallback("model_name", "deepseek-v4-pro")
     )
     report_model: str = field(
-        default_factory=lambda: _json_or_fallback("model_name", "gpt-5.4-mini")
+        default_factory=lambda: _json_or_fallback("model_name", "deepseek-v4-pro")
     )
     temperature: float = field(
         default_factory=lambda: _JSON_CFG.get("temperature", 0.7)
