@@ -85,6 +85,7 @@ class ExecutorAgent:
             prompt = renderer.render(
                 templates.EXECUTOR_MAIN,
                 database_type=self._config.database.database_type,
+                db_description=self._config.db_description,
                 curr_date=datetime.now().strftime("%Y-%m-%d"),
                 conversation_history=[
                     {

@@ -726,27 +726,20 @@ Example response:
 # =============================================================================
 EXECUTOR_MAIN = """\
 # instruction
-Your task is to write a **{{ database_type }}** query to answer the given question. Follow a step-by-step
-process:
+Your task is to write a **{{ database_type }}** query to answer the given question.
+
 - User question is contextual. If needed, the current date is {{ curr_date }}
-- Start by constructing simple fragments of the **{{ database_type }}** query.
-- Execute each fragment to verify its correctness. Adjust as needed based on your the observations.
-- Confirm all your assumptions about the structure of the database before proceeding.
 - Do NOT repeat the same action, as the results will be the same.
-- You will always be shown with a sample of database results. If user is asking for all entries, entire
-  results will be displayed in a seperate module.
-- Output one final SQL at the end that contains all results. You can only output one SQL query (not multiple
-  ";" separated queries).
-- For stats/visualizations, you should call the execute_python_from_sql action AFTER you have determined the
-  final SQL query.
-- Only the latest plot will be shown to you.
+- Output one final SQL at the end that contains all results (not multiple ";" separated queries).
+- For stats/visualizations, call execute_python_from_sql AFTER you have determined the final SQL query.
 
-IMPORTANT: BE EFFICIENT. You have a LIMITED number of turns. Once you have obtained a SQL result that
-answers the question, call stop() IMMEDIATELY. Do not run additional exploratory queries or refinements
-unless the current result is clearly wrong or incomplete. The goal is to answer the question with the
-minimum number of actions necessary.
+IMPORTANT: BE EFFICIENT. You have a LIMITED number of turns. Once you have a SQL result that
+answers the question, call stop() IMMEDIATELY.
 
-Form exactly one "Thought" and perform exactly one "Action", then wait for the "Observation".
+{% if db_description %}
+# Database Schema & Environment (already provided — go directly to execute_sql)
+{{ db_description }}
+{% endif %}
 
 The required output format is EXACTLY:
 Thought: <your reasoning>
@@ -755,19 +748,13 @@ Action: <action_name>(<arguments>)
 Do NOT wrap your response in markdown code blocks or add any other formatting.
 
 Possible actions are:
-- get_tables(): Retrieves all the tables with a corresponding short description. **You should use this action
-  to get the available tables**
-- retrieve_tables_details([table_names]): Retrieve more details about table(s). The argument should be a list
-  of table names as strigns. // Example: retrieve_tables_details(["table1"]) or
-  retrieve_tables_details(["table1", "table2"])
+- get_tables(): Retrieves all tables (skip this if schema is provided above).
+- retrieve_tables_details([table_names]): Retrieve column details (skip if schema is provided above).
 - execute_sql(sql): Runs a SQL query and returns results.
-- execute_python_from_sql(sql, python_code): Executes a Python code based on the results of the SQL query.
-  The argument should be a Python tuple containing the SQL query and the Python code. Your python code
-  can reference the results of the SQL query using the `sql_results` variable, which will be passed in as
-  a pandas dataframe. The two codes should be wrapped in string quotes(") // Example:
-  execute_python_from_sql("SELECT * FROM table1", "print(sql_results)")
-- stop(): Marks the last executed SQL query as the final answer and ends the process. CALL THIS AS SOON AS
-  you have a satisfactory result. Do not continue exploring after you have the answer.
+- execute_python_from_sql(sql, python_code): Executes Python on the SQL result DataFrame.
+  Available: numpy (np), pandas (pd), scipy, scipy.stats (stats). Variable: sql_results (DataFrame).
+  Example: execute_python_from_sql("SELECT * FROM t", "print(sql_results.describe())")
+- stop(): Marks the last executed SQL as final answer. CALL THIS when you have the result.
 
 # input
 {% if conversation_history %}
