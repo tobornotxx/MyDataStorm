@@ -86,7 +86,7 @@ class LLMClient:
             "LLM request: model=%s, temperature=%s, max_completion_tokens=%s, json_mode=%s",
             model, temperature, max_completion_tokens, json_mode,
         )
-        logger.debug("LLM prompt (%d chars):\n%s", len(prompt), prompt[:2000])
+        logger.debug("LLM prompt (%d chars):\n%s", len(prompt), prompt[:6000])
 
         for attempt in range(max_retries):
             try:
@@ -98,7 +98,7 @@ class LLMClient:
                     len(content),
                     usage.prompt_tokens if usage else "?",
                     usage.completion_tokens if usage else "?",
-                    content[:2000],
+                    content[:6000],
                 )
                 return content
             except Exception as e:
