@@ -18,6 +18,8 @@ DataSTORM 将探索空间组织为层 (layers), 最多 m 层。
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import deepcopy
 
 from datastorm.agents.executor import ExecutorAgent
 from datastorm.agents.planner import PlannerAgent
@@ -108,26 +110,50 @@ class ExplorationFramework:
 
             logger.info("Layer %d: Planner generated %d questions", layer, len(questions))
 
-            # Step 2: Executor 执行每个问题
+            # Step 2: Executor 并行执行每个问题
             db_responses: list[ExecutorResponse] = []
             internet_responses: list[ExecutorResponse] = []
 
-            for q in questions:
-                if q.destination == QuestionDestination.DATABASE:
-                    # 论文: 每个 Executor 独立执行, 不共享对话历史
-                    self._executor.reset_history()
-                    resp = self._executor.execute(q.question)
-                    db_responses.append(resp)
-                else:
-                    # 互联网问题: 使用 Web 搜索
-                    search_result = self._searcher.search_and_format(q.question)
-                    internet_responses.append(
-                        ExecutorResponse(
-                            question=q.question,
-                            answer=search_result,
-                            sql="",
-                        )
+            def _run_db_question(question: str) -> ExecutorResponse:
+                """每个 executor 独立运行（独立 LLM client, 无共享状态）。"""
+                executor = ExecutorAgent(self._llm, self._executor._db, self._config)
+                return executor.execute(question)
+
+            db_questions = [q for q in questions if q.destination == QuestionDestination.DATABASE]
+            internet_questions = [q for q in questions if q.destination != QuestionDestination.DATABASE]
+
+            # 并行执行数据库查询
+            if db_questions:
+                with ThreadPoolExecutor(max_workers=len(db_questions)) as pool:
+                    futures = {
+                        pool.submit(_run_db_question, q.question): i
+                        for i, q in enumerate(db_questions)
+                    }
+                    # 按原始顺序收集结果
+                    results_by_idx: dict[int, ExecutorResponse] = {}
+                    for future in as_completed(futures):
+                        idx = futures[future]
+                        try:
+                            results_by_idx[idx] = future.result()
+                        except Exception as e:
+                            logger.error("Executor failed for question %d: %s", idx, e)
+                            results_by_idx[idx] = ExecutorResponse(
+                                question=db_questions[idx].question,
+                                answer=f"Execution failed: {e}",
+                                sql="",
+                            )
+                    db_responses = [results_by_idx[i] for i in range(len(db_questions))]
+
+            # 互联网问题（通常为空，因为 Serper 禁用）
+            for q in internet_questions:
+                search_result = self._searcher.search_and_format(q.question)
+                internet_responses.append(
+                    ExecutorResponse(
+                        question=q.question,
+                        answer=search_result,
+                        sql="",
                     )
+                )
 
             # Step 3: Query Consistency Detection (论文 Section 3.2.1)
             if db_responses:
@@ -136,23 +162,36 @@ class ExplorationFramework:
                     existing_insights=self._insight_bank.insights,
                 )
 
-                # Step 4: 执行跟进查询
+                # Step 4: 并行执行跟进查询
+                follow_up_tasks: list[tuple[int, str, str]] = []
                 for i, follow_up in enumerate(follow_ups):
                     if follow_up.follow_up_question:
                         logger.info(
                             "Layer %d: Consistency follow-up for query %d", layer, i
                         )
-                        # 论文: 跟进查询连同原始 (q_{i,j}, s_{i,j}) 作为上下文
                         context = (
                             f"Original question: {follow_up.original_question}\n"
                             f"Original SQL: {follow_up.original_sql}\n"
                             f"Follow-up instruction: {follow_up.follow_up_question}"
                         )
-                        updated_resp = self._executor.execute(
-                            follow_up.follow_up_question,
-                            context=context,
-                        )
-                        db_responses[i] = updated_resp
+                        follow_up_tasks.append((i, follow_up.follow_up_question, context))
+
+                if follow_up_tasks:
+                    def _run_follow_up(question: str, context: str) -> ExecutorResponse:
+                        executor = ExecutorAgent(self._llm, self._executor._db, self._config)
+                        return executor.execute(question, context=context)
+
+                    with ThreadPoolExecutor(max_workers=len(follow_up_tasks)) as pool:
+                        fu_futures = {
+                            pool.submit(_run_follow_up, q, ctx): idx
+                            for idx, q, ctx in follow_up_tasks
+                        }
+                        for future in as_completed(fu_futures):
+                            idx = fu_futures[future]
+                            try:
+                                db_responses[idx] = future.result()
+                            except Exception as e:
+                                logger.error("Follow-up failed for query %d: %s", idx, e)
 
             # Step 5: 嵌入汇总统计 (论文 Section 3.2.1, Bottom-up inductive)
             for i, resp in enumerate(db_responses):

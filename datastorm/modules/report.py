@@ -81,16 +81,27 @@ class ReportGenerator:
             [(s.section_id, s.heading) for s in outline.sections],
         )
 
-        # Stage B: 章节草稿 (Prompt 13)
-        drafted_sections = []
-        for section_spec in outline.sections:
+        # Stage B: 章节草稿 (Prompt 13) — 并行生成各章节
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _draft_section(section_spec: SectionSpec) -> DraftedSection:
             web_context = self._fetch_web_context(section_spec.web_queries)
-            draft = self._stage_b_draft(topic, thesis, title_package, section_spec, web_context)
-            drafted_sections.append(draft)
-            logger.debug(
-                "Stage B: section %s drafted (%d chars, %d citations)",
-                draft.section_id, len(draft.markdown), len(draft.used_citations),
-            )
+            return self._stage_b_draft(topic, thesis, title_package, section_spec, web_context)
+
+        drafted_sections: list[DraftedSection] = [None] * len(outline.sections)  # type: ignore
+        with ThreadPoolExecutor(max_workers=len(outline.sections)) as pool:
+            futures = {
+                pool.submit(_draft_section, spec): i
+                for i, spec in enumerate(outline.sections)
+            }
+            for future in as_completed(futures):
+                idx = futures[future]
+                draft = future.result()
+                drafted_sections[idx] = draft
+                logger.debug(
+                    "Stage B: section %s drafted (%d chars, %d citations)",
+                    draft.section_id, len(draft.markdown), len(draft.used_citations),
+                )
         logger.info("Stage B complete: %d sections drafted", len(drafted_sections))
 
         # Stage C: 引用验证 (Prompt 14) — 可通过配置跳过
