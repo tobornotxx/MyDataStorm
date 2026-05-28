@@ -59,10 +59,13 @@ class PlannerAgent:
             article=warmstart_report if warmstart_report else None,
         )
 
-        response = self._llm.generate(prompt, temperature=0.7)
-        questions = self._parse_initial_questions(response)
-        # 硬截断：LLM 可能无视 prompt 里的数量限制
-        questions = questions[:max_q]
+        # 使用 json_mode 强制结构化输出
+        response = self._llm.generate_json(prompt, temperature=0.7)
+        questions = self._parse_exploration_questions(response)
+        # 安全截断：保证不超过 max_q（即使 LLM 返回更多）
+        if len(questions) > max_q:
+            logger.warning("Planner returned %d questions, truncating to %d", len(questions), max_q)
+            questions = questions[:max_q]
         logger.debug(
             "Initial questions generated: %s",
             [(q.question[:80], q.destination.value) for q in questions],
@@ -107,8 +110,10 @@ class PlannerAgent:
 
         response = self._llm.generate_json(prompt, temperature=0.7)
         questions = self._parse_exploration_questions(response)
-        # 硬截断：LLM 可能无视 prompt 里的数量限制
-        questions = questions[:max_q]
+        # 安全截断：保证不超过 max_q（即使 LLM 返回更多）
+        if len(questions) > max_q:
+            logger.warning("Planner returned %d questions, truncating to %d", len(questions), max_q)
+            questions = questions[:max_q]
         logger.debug(
             "Exploration questions generated: %s",
             [(q.question[:80], q.destination.value) for q in questions],

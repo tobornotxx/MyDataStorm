@@ -37,32 +37,29 @@ now is to ask new questions based on the table returned. A list of global insigh
 should NOT ask questions that are
 already covered by the global insights.
 
-Ask 1 - {{ max_questions }} specific questions to further explore relevant topics.
-- Generate 1 to {{ max_questions }} questions.
-- You are NOT required to ask all {{ max_questions }} questions.
+Generate EXACTLY {{ max_questions }} questions to further explore relevant topics.
+- You MUST generate exactly {{ max_questions }} questions — no more, no less.
 - Make each question self-contained and clearly scoped.
-- Follow a step-by-step process:
-  1. Identify the question you are interested in.
-  2. For database questions, specify the expected output format, the number of columns, and the names of
-     those columns.
-  3. Ensure the question is self-contained and clearly scoped.
+- Each question should investigate one specific aspect.
+- Cover diverse dimensions (time trends, category breakdown, agent performance, correlations, anomalies).
 
 For each question, also specify a "destination" to indicate where the question should be routed:
 - "database": The question can be answered by querying the database (e.g., aggregations, distributions,
   trends, filters, correlations, rankings,
   or any computation over the data).
-- "internet": The question requires external context NOT available in the database (e.g., definitions of
-  domain terms, historical context,
-  industry benchmarks, comparisons with external data, regulatory background, or general domain knowledge).
+- "internet": The question requires external context NOT available in the database.
 
 Most questions should be "database" - only use "internet" when the answer genuinely cannot come from the
 database.
 
-Output a JSON object with:
-- "chain_of_thought": your reasoning about what aspects to explore
-- "questions": a list of objects, each with:
-  - "question": the question text (self-contained and clearly scoped)
-  - "destination": either "internet" or "database"
+Output a JSON object with EXACTLY this structure:
+{
+  "chain_of_thought": "your reasoning about what aspects to explore",
+  "questions": [
+    {"question": "...", "destination": "database"},
+    ... (EXACTLY {{ max_questions }} items)
+  ]
+}
 
 # input
 Description of database content: {{ db_description }}
@@ -170,26 +167,29 @@ Output a JSON following examples.
 # =============================================================================
 INSIGHT_BANK_FILTER = """\
 # instruction
-You are given a list of insights related to a topic. Your task is to select the most interesting and relevant
-insights capped at {{ max_num_insights }}.
-You should NOT select similar insight twice.
+You are given a list of candidate insights derived from database exploration on a topic.
+Your task is to select the most valuable insights, capped at {{ max_num_insights }}.
+
+## Selection criteria (in priority order):
+1. **Anomalies and surprises**: findings that reveal unexpected patterns, outliers, or counter-intuitive results (e.g., one category growing while others shrink, a metric behaving opposite to expectation)
+2. **Significant trends**: statistically significant changes over time, strong correlations, or clear distributional skews
+3. **Actionable findings**: observations that point to root causes or have clear operational implications
+4. **Breadth of coverage**: prefer a diverse set of insights covering different dimensions (time, category, agent, priority) over many insights about the same dimension
+
+## De-prioritize:
+- Redundant findings that repeat what another selected insight already says
+- Trivial or expected observations (e.g., "data has 500 rows", "5 categories exist")
+- Findings where the analysis failed or produced no result
 
 The topic is: {{ topic }}
 
-The database you are using is: {{ db_description }}
+The database context: {{ db_description }}
 
 {% if thesis %}
-## Guiding Thesis
-The article being built argues: "{{ thesis }}"
-
-Prioritize insights that are most useful for developing this argument - this includes:
-- **Supporting evidence**: findings that directly build or strengthen the thesis
-- **Qualifying evidence**: findings that add nuance, scope limits, or important caveats
-- **Refuting evidence**: findings that challenge or contradict the thesis - strong analytical articles
-  steel-man
-  counter-arguments rather than ignore them
-
-Deprioritize insights that are entirely off-topic or redundant with others already selected.
+## Current working thesis (for context, NOT as a filter):
+"{{ thesis }}"
+Note: Do NOT filter out findings just because they don't support the thesis.
+Surprising findings that contradict or are orthogonal to the thesis are often the most valuable.
 {% endif %}
 
 Output a JSON dict, where each key is a node_id and the value is the insight for that node_id.
@@ -290,17 +290,22 @@ INITIAL_QUESTIONS_GENERATION = """\
 You are conducting research on a goal/topic: "{{ topic }}". The goal here is to extract previously unknown
 insights by exploring and observing the information in the database with the following description: {{ db_description }}.
 
-Generate up to {{ num_questions }} questions that an investigator will be interested in. You do not need to
-generate all {{ num_questions }} questions if you believe you only need to ask 1-2 to get started. The
-questions will be used to generate search queries in the database to help answer them. The questions
-should be self-contained (include any specific years, months, locations, etc. instead of a reference
-that requires the reader to know the context) and related to the goal/topic: "{{ topic }}". Investigate
-any correlations as you see fit. Do not generate overly complex questions. Each question should be
-investigate one aspect but do not include too many subquestions inside a single question.
+Generate EXACTLY {{ num_questions }} questions that an investigator will be interested in.
+- You MUST generate exactly {{ num_questions }} questions — no more, no less.
+- The questions will be used to generate search queries in the database to help answer them.
+- The questions should be self-contained (include any specific years, months, locations, etc.)
+  and related to the goal/topic: "{{ topic }}".
+- Each question should investigate one specific aspect. Do not include too many subquestions inside a single question.
+- Cover diverse dimensions: time trends, category/group breakdowns, agent performance, correlations, anomalies.
+- The questions should be independent of each other.
 
-IMPORTANT: the questions should be independent of each other. If you believe some questions need to be
-answered first, only generate those questions and not others that depend on the answers to the first
-questions.
+Output a JSON object with EXACTLY this structure:
+{
+  "questions": [
+    {"question": "...", "destination": "database"},
+    ... (EXACTLY {{ num_questions }} items)
+  ]
+}
 
 {% if article %}
 Here is more background information on the goal/topic based on the internet: "{{ article }}".
