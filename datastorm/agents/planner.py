@@ -61,6 +61,8 @@ class PlannerAgent:
 
         response = self._llm.generate(prompt, temperature=0.7)
         questions = self._parse_initial_questions(response)
+        # 硬截断：LLM 可能无视 prompt 里的数量限制
+        questions = questions[:max_q]
         logger.debug(
             "Initial questions generated: %s",
             [(q.question[:80], q.destination.value) for q in questions],
@@ -105,6 +107,8 @@ class PlannerAgent:
 
         response = self._llm.generate_json(prompt, temperature=0.7)
         questions = self._parse_exploration_questions(response)
+        # 硬截断：LLM 可能无视 prompt 里的数量限制
+        questions = questions[:max_q]
         logger.debug(
             "Exploration questions generated: %s",
             [(q.question[:80], q.destination.value) for q in questions],
