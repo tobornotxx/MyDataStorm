@@ -57,6 +57,6 @@ InsightBench 的 GT 中有 3/8 条（G6, G7 部分）是建议性内容（如 "R
 
 ## Known Issues
 
-- Planner 生成问题数已做硬截断（代码层面 `[:max_q]`），但 prompt 里的 "up to N" 对 deepseek-v4-pro 约束力不足
+- Planner 生成问题数：prompt 里说 "EXACTLY N" + JSON 模式 + 代码截断兜底，实测服从度高但非 100%。更稳的做法是让 LLM 返回以 `"1"`, `"2"`, ... `"N"` 为 key 的 dict 而非 array（int-key dict 对 LLM 约束力更强，实验验证过）。但 json-in-json 的 output schema 兼容性差，暂不实现。
 - `execute_python_from_sql` 的 sandbox 不允许 `import` 语句（安全限制），agent 需要使用预注入的变量名（np, pd, stats 等）
 - Warm-start 阶段因为 Serper API 禁用，只基于 dataset description 臆想 insights（对 InsightBench 场景是纯噪声）
