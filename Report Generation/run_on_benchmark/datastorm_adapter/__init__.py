@@ -1,0 +1,1 @@
+# DataStorm → InsightBench adapter package
