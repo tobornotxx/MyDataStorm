@@ -103,6 +103,10 @@ class ExplorationConfig:
     # 论文 Section 4.1: 第一层 2 个查询, 后续层 5 个查询
     first_layer_max_questions: int = 2
     subsequent_layer_max_questions: int = 5
+    # 每层基于已有问题提出的跟进问题数 (m, 下限)
+    follow_up_questions_per_layer: int = 3
+    # 每层提出的全新探索性问题数 (n, 下限)
+    exploratory_questions_per_layer: int = 2
     # Executor ReAct 最大轮数 (论文 Appendix B)
     executor_max_turns: int = 15
     # 论点生成频率: 每 p 层生成/精炼一次 (论文 Section 3.2.2)
@@ -111,6 +115,8 @@ class ExplorationConfig:
     max_insights: int = 50
     # 结果表截断行数
     max_table_rows: int = 50
+    # 早期停止: 连续 N 层洞察库未增长则停止 (0 = 禁用)
+    early_stop_patience: int = 2
 
 
 @dataclass

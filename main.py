@@ -135,7 +135,8 @@ def main() -> int:
 
     pipeline = DataSTORMPipeline(config)
     try:
-        report = pipeline.run(args.query)
+        output_dir = str(Path(args.output).parent) if args.output else None
+        report = pipeline.run(args.query, output_dir=output_dir)
         save_report(report, args.output)
         return 0
     finally:

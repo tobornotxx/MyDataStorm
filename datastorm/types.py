@@ -38,6 +38,43 @@ class ExplorerQuestion:
 
 
 @dataclass
+class QuestionNode:
+    """问题树节点，记录问题的完整链和继承关系。
+
+    每个问题在提出时即分配唯一 ID，执行后记录答案。
+    parent_ids 记录该问题由哪些已有问题派生而来，
+    category 区分"跟进问题 (follow_up)"和"探索性问题 (exploratory)"。
+
+    Attributes:
+        id: 唯一标识 (UUID)
+        question: 问题文本
+        destination: 路由目标
+        layer: 所属探索层编号
+        parent_ids: 派生来源的问题 ID 列表
+        category: "follow_up" (基于已有问题的深入) 或 "exploratory" (新探索方向)
+        answer: 自然语言答案 (执行后填充)
+        sql: 执行的 SQL (执行后填充)
+        summary_text: 包含统计的摘要文本 (执行后填充)
+        summary_stats: 列级统计 (执行后填充)
+        raw_results: 原始查询结果
+        row_count: 结果行数
+    """
+
+    id: str
+    question: str
+    destination: QuestionDestination = QuestionDestination.DATABASE
+    layer: int = 0
+    parent_ids: list[str] = field(default_factory=list)
+    category: str = "exploratory"
+    answer: str = ""
+    sql: str = ""
+    summary_text: str = ""
+    summary_stats: list["SummaryStatistics"] = field(default_factory=list)
+    raw_results: Any = None
+    row_count: int = 0
+
+
+@dataclass
 class SummaryStatistics:
     """列级别汇总统计 (论文 Section 3.2.1, 自底向上归纳)。
 

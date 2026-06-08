@@ -81,6 +81,95 @@ challenge or qualify the thesis - strong analysis addresses counter-arguments.
 """
 
 # =============================================================================
+# Prompt 5b: 双模式问题生成 — 基于问题树的跟进 + 探索
+# 每一步基于已有问题提出至少 m 个跟进问题 + 至少 n 个全新探索方向,
+# agent 自主决定每层最终提几个问题 (m/n 为下限, 每类上限5个)。
+# =============================================================================
+TREE_BASED_QUESTION_GENERATION = """\
+# instruction
+You are an analytical reasoning engine exploring a relational database.
+Your goal is to discover surprising, meaningful, and previously unknown insights.
+
+You have access to:
+1. A QUESTION TREE showing all previously asked questions, organized by layer,
+   with their answers and results.
+2. A list of GLOBAL INSIGHTS that have been extracted from those answers.
+3. A research THESIS (if one has been formed).
+
+Your task is to generate TWO groups of questions:
+
+## Group A: FOLLOW-UP questions (AT LEAST {{ m }}, AT MOST 5 questions)
+- These should deepen EXISTING lines of investigation found in the question tree.
+- Look at questions that revealed interesting partial results or anomalies,
+  and drill deeper into those findings.
+- Each follow-up question MUST reference which existing question(s) it extends,
+  using the "parent_ids" field with question node IDs from the tree.
+- Follow-up questions should be more specific and targeted than their parents.
+- Generate more than {{ m }} if the data suggests many lines of investigation
+  are worth pursuing deeper.
+
+## Group B: EXPLORATORY questions (AT LEAST {{ n }}, AT MOST 5 questions)
+- These should open ENTIRELY NEW investigation directions NOT covered by existing questions.
+- Cover different dimensions: time trends, category breakdowns, correlations,
+  anomalies, cross-variable interactions, distributions, outliers.
+- Ensure these questions are self-contained and independent.
+- Exploratory questions should have an empty "parent_ids" list.
+- Generate more than {{ n }} if there are many unexplored dimensions in the data.
+
+## Routing
+For each question, specify a "destination":
+- "database": answerable by querying the database
+- "internet": requires external context (use sparingly)
+
+## Rules
+- You MUST generate AT LEAST {{ m }} follow-up questions AND AT LEAST {{ n }} exploratory questions.
+- Each type MUST NOT exceed 5 questions. If there aren't enough good questions, fewer is fine — but never exceed 5.
+- Do NOT ask questions already covered by existing questions or global insights.
+- Ensure diversity across all generated questions.
+- Make each question clear, specific, and scoped to one aspect.
+- Be decisive: generate the number of questions that is appropriate for the current state
+  of exploration. Do NOT pad with weak questions just to hit a number.
+
+{% if thesis %}
+## Current Thesis
+"{{ thesis }}"
+Research strategy: {{ research_strategy }}
+Prioritize questions that help build, test, or refine this argument.
+Also ask questions that challenge or qualify the thesis - strong analysis addresses counter-arguments.
+{% endif %}
+
+Output a JSON object with this structure:
+{
+  "chain_of_thought": "your reasoning about the question tree, gaps, and new directions",
+  "follow_up_questions": [
+    {
+      "question": "...",
+      "destination": "database",
+      "parent_ids": ["<node_id_from_tree>", ...]
+    }
+  ],
+  "exploratory_questions": [
+    {
+      "question": "...",
+      "destination": "database",
+      "parent_ids": []
+    }
+  ]
+}
+
+# input
+Description of database content: {{ db_description }}
+
+Topic: {{ topic }}
+
+QUESTION TREE (all previously asked questions with their answers):
+{{ question_tree }}
+
+GLOBAL INSIGHTS extracted so far:
+{{ global_insights }}
+"""
+
+# =============================================================================
 # Prompt 6 (Table 6): 探索直接 SQL 生成 Prompt
 # 用于生成带 filter/groupby 的 SELECT * SQL, 供汇总统计使用
 # =============================================================================

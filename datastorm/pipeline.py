@@ -53,7 +53,7 @@ class DataSTORMPipeline:
         # 初始化 modules
         self._insight_bank = InsightBank(self._llm, config)
 
-    def run(self, query: str) -> FinalReport:
+    def run(self, query: str, output_dir: str | None = None) -> FinalReport:
         """执行完整的 DataSTORM 研究流水线。
 
         论文 Section 3:
@@ -63,6 +63,7 @@ class DataSTORMPipeline:
 
         Args:
             query: 用户研究查询 q
+            output_dir: 输出目录 (用于保存问题树日志等中间产物)
 
         Returns:
             最终研究报告 r
@@ -98,6 +99,7 @@ class DataSTORMPipeline:
             searcher=self._searcher,
             insight_bank=self._insight_bank,
             config=self._config,
+            output_dir=output_dir,
         )
 
         final_insights, final_thesis = exploration.run(
