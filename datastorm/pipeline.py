@@ -24,7 +24,6 @@ from datastorm.llm.client import LLMClient
 from datastorm.modules.exploration import ExplorationFramework
 from datastorm.modules.insight_bank import InsightBank
 from datastorm.modules.report import ReportGenerator
-from datastorm.modules.warmstart import WarmStartModule
 from datastorm.types import FinalReport, Thesis
 
 logger = logging.getLogger(__name__)
@@ -74,19 +73,13 @@ class DataSTORMPipeline:
         logger.info("=" * 60)
 
         # =========================================================
-        # Stage 1: Warm-Start with Internet Research (Section 3.1)
+        # Stage 1: Warm-Start — SKIPPED
+        # (Internet search is useless for local CSV/DB-only scenarios;
+        #  wastes 2-3 API calls and produces misleading context)
         # =========================================================
-        logger.info("--- Stage 1: Warm-Start with Internet Research ---")
-        warmstart = WarmStartModule(self._llm, self._searcher, self._config)
-        warmstart_report, initial_insights = warmstart.run(query)
-
-        # 初始化全局洞察库 B₀
-        self._insight_bank.initialize(initial_insights)
-        logger.info(
-            "Warm-start complete: report=%d chars, B₀=%d insights",
-            len(warmstart_report),
-            len(initial_insights),
-        )
+        logger.info("--- Stage 1: Warm-Start SKIPPED (no internet context needed) ---")
+        warmstart_report = ""
+        self._insight_bank.initialize([])
 
         # =========================================================
         # Stage 2: Multi-Agent Exploration (Section 3.2)
