@@ -385,8 +385,16 @@ Generate EXACTLY {{ num_questions }} questions that an investigator will be inte
 - The questions should be self-contained (include any specific years, months, locations, etc.)
   and related to the goal/topic: "{{ topic }}".
 - Each question should investigate one specific aspect. Do not include too many subquestions inside a single question.
-- Cover diverse dimensions: time trends, category/group breakdowns, agent performance, correlations, anomalies.
 - The questions should be independent of each other.
+
+CRITICAL: Layer 1 questions MUST prioritize fundamental EDA (Exploratory Data Analysis). Include these types:
+1. Distribution/breakdown by key categorical columns (e.g., "What is the distribution of X across categories?")
+2. Time trends (e.g., "How does the volume/metric change over time? Is there an increasing or decreasing trend?")
+3. Correlations or lack thereof between key numeric variables (e.g., "Is there a correlation between volume and resolution time?")
+4. Per-group comparisons (e.g., "Is performance/metric uniform across all agents/groups, or does one stand out?")
+
+Do NOT jump to advanced analysis (statistical tests, Gini coefficients, outlier detection) in Layer 1.
+Start with basic counts, averages, and trend lines. Advanced analysis belongs in later layers.
 
 Output a JSON object with EXACTLY this structure:
 {
