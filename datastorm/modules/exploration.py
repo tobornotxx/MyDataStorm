@@ -225,13 +225,13 @@ class ExplorationFramework:
 
             # ── Step 3-4: 一致性检测 + 跟进执行 ──
             if db_responses:
-                follow_ups = self._consistency.detect_inconsistencies(
+                consistency_follow_ups = self._consistency.detect_inconsistencies(
                     responses=db_responses,
                     existing_insights=self._insight_bank.insights,
                 )
 
                 follow_up_tasks: list[tuple[int, str, str]] = []
-                for i, follow_up in enumerate(follow_ups):
+                for i, follow_up in enumerate(consistency_follow_ups):
                     if follow_up.follow_up_question:
                         logger.info("Layer %d: Consistency follow-up for query %d", layer, i)
                         context = (

@@ -31,22 +31,29 @@ Prompt 编号与论文表格对应关系:
 # =============================================================================
 EXPLORATION_QUESTIONS_GENERATION = """\
 # instruction
-You are an analytical reasoning engine that explores a relational database. Your goal is to discover
-surprising or meaningful insights. Your task
-now is to ask new questions based on the table returned. A list of global insights is provided to you. You
-should NOT ask questions that are
-already covered by the global insights.
+You are an analytical reasoning engine that explores a relational database.
+Your task is to make progress on a specific research goal by generating targeted questions.
+
+## CRITICAL: Stay Aligned With the Original Research Goal
+The research goal is: "{{ topic }}"
+
+EVERY question you generate MUST directly serve this goal.
+- Do NOT explore dimensions that are not relevant to the goal, even if they seem "interesting".
+- Do NOT deviate into priority analysis, time-of-day analysis, or caller analysis unless the
+  goal explicitly asks for it.
+- Each new question should answer: "Does this help achieve the original goal?"
 
 Generate EXACTLY {{ max_questions }} questions to further explore relevant topics.
 - You MUST generate exactly {{ max_questions }} questions — no more, no less.
 - Make each question self-contained and clearly scoped.
 - Each question should investigate one specific aspect.
-- Cover diverse dimensions (time trends, category breakdown, agent performance, correlations, anomalies).
+- Cover diverse dimensions that are RELEVANT TO THE GOAL
+  (e.g., time trends, category breakdown, agent performance, correlations, anomalies —
+  only when those dimensions are called for by the goal).
 
 For each question, also specify a "destination" to indicate where the question should be routed:
 - "database": The question can be answered by querying the database (e.g., aggregations, distributions,
-  trends, filters, correlations, rankings,
-  or any computation over the data).
+  trends, filters, correlations, rankings, or any computation over the data).
 - "internet": The question requires external context NOT available in the database.
 
 Most questions should be "database" - only use "internet" when the answer genuinely cannot come from the
@@ -54,7 +61,7 @@ database.
 
 Output a JSON object with EXACTLY this structure:
 {
-  "chain_of_thought": "your reasoning about what aspects to explore",
+  "chain_of_thought": "restate the goal, then explain how each question serves it",
   "questions": [
     {"question": "...", "destination": "database"},
     ... (EXACTLY {{ max_questions }} items)
@@ -64,11 +71,11 @@ Output a JSON object with EXACTLY this structure:
 # input
 Description of database content: {{ db_description }}
 
+Research Goal (stay aligned with this at all times): {{ topic }}
+
 Global insights: {{ global_insights }}
 
 Conversation history: {{ dialogue_turns }}
-
-Topic/Question you are writing: {{ topic }}
 
 {% if thesis %}
 You are building evidence for the following thesis: "{{ thesis }}"
@@ -88,7 +95,7 @@ challenge or qualify the thesis - strong analysis addresses counter-arguments.
 TREE_BASED_QUESTION_GENERATION = """\
 # instruction
 You are an analytical reasoning engine exploring a relational database.
-Your goal is to discover surprising, meaningful, and previously unknown insights.
+Your task is to make progress on a specific research goal by generating targeted questions.
 
 You have access to:
 1. A QUESTION TREE showing all previously asked questions, organized by layer,
@@ -96,25 +103,42 @@ You have access to:
 2. A list of GLOBAL INSIGHTS that have been extracted from those answers.
 3. A research THESIS (if one has been formed).
 
+## CRITICAL: Stay Aligned With the Original Research Goal
+The original research goal is: "{{ topic }}"
+
+EVERY question you generate — whether follow-up or exploratory — MUST directly serve this goal.
+Before generating each question, ask yourself: "Does answering this question help achieve the original goal?"
+- YES → include it.
+- NO  → discard it and think of a better question that does.
+
+Common failure modes to AVOID:
+- Do NOT explore dimensions (e.g., priority, business hours, day-of-week) just because
+  they are "interesting" or available in the data, if they are not asked for by the goal.
+- Do NOT wander into unrelated territory: if the goal is about volume trends, stay on
+  volume trends; if it is about resolution time, stay on resolution time.
+- Exploratory questions should open NEW ANGLES on the SAME goal, not drift away from it.
+
 Your task is to generate TWO groups of questions:
 
 ## Group A: FOLLOW-UP questions (AT LEAST {{ m }}, AT MOST 5 questions)
-- These should deepen EXISTING lines of investigation found in the question tree.
+- These should deepen EXISTING lines of investigation found in the question tree
+  that are relevant to the goal.
 - Look at questions that revealed interesting partial results or anomalies,
-  and drill deeper into those findings.
+  and drill deeper into those findings — as long as the drill-down still serves the goal.
 - Each follow-up question MUST reference which existing question(s) it extends,
   using the "parent_ids" field with question node IDs from the tree.
 - Follow-up questions should be more specific and targeted than their parents.
-- Generate more than {{ m }} if the data suggests many lines of investigation
+- Generate more than {{ m }} if the data suggests many goal-relevant lines of investigation
   are worth pursuing deeper.
 
 ## Group B: EXPLORATORY questions (AT LEAST {{ n }}, AT MOST 5 questions)
-- These should open ENTIRELY NEW investigation directions NOT covered by existing questions.
-- Cover different dimensions: time trends, category breakdowns, correlations,
-  anomalies, cross-variable interactions, distributions, outliers.
+- These should open ENTIRELY NEW investigation directions NOT covered by existing questions,
+  but still in service of the original goal.
+- Valid new angles aligned with most goals: time trends, category breakdowns, correlations,
+  geographic or group-level breakdowns, root-cause identification via text fields.
 - Ensure these questions are self-contained and independent.
 - Exploratory questions should have an empty "parent_ids" list.
-- Generate more than {{ n }} if there are many unexplored dimensions in the data.
+- Generate more than {{ n }} if there are unexplored goal-relevant dimensions in the data.
 
 ## Routing
 For each question, specify a "destination":
@@ -125,7 +149,6 @@ For each question, specify a "destination":
 - You MUST generate AT LEAST {{ m }} follow-up questions AND AT LEAST {{ n }} exploratory questions.
 - Each type MUST NOT exceed 5 questions. If there aren't enough good questions, fewer is fine — but never exceed 5.
 - Do NOT ask questions already covered by existing questions or global insights.
-- Ensure diversity across all generated questions.
 - Make each question clear, specific, and scoped to one aspect.
 - Be decisive: generate the number of questions that is appropriate for the current state
   of exploration. Do NOT pad with weak questions just to hit a number.
@@ -140,7 +163,7 @@ Also ask questions that challenge or qualify the thesis - strong analysis addres
 
 Output a JSON object with this structure:
 {
-  "chain_of_thought": "your reasoning about the question tree, gaps, and new directions",
+  "chain_of_thought": "first restate the original goal, then explain how each question group serves it",
   "follow_up_questions": [
     {
       "question": "...",
@@ -160,7 +183,7 @@ Output a JSON object with this structure:
 # input
 Description of database content: {{ db_description }}
 
-Topic: {{ topic }}
+Research Goal (stay aligned with this at all times): {{ topic }}
 
 QUESTION TREE (all previously asked questions with their answers):
 {{ question_tree }}
