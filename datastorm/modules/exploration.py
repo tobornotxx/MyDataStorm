@@ -32,6 +32,7 @@ from datastorm.config import DataSTORMConfig
 from datastorm.internet.search import WebSearcher
 from datastorm.llm.client import LLMClient
 from datastorm.modules.consistency import QueryConsistencyModule
+from datastorm.modules.goal_sufficiency import GoalSufficiencyModule
 from datastorm.modules.insight_bank import InsightBank
 from datastorm.modules.question_logger import QuestionLogger
 from datastorm.modules.statistics import StatisticsModule
@@ -78,6 +79,7 @@ class ExplorationFramework:
         self._consistency = QueryConsistencyModule(llm, config)
         self._statistics = StatisticsModule()
         self._thesis_module = ThesisModule(llm, config)
+        self._goal_sufficiency = GoalSufficiencyModule(llm, config)
 
         self._thesis: Thesis | None = None
 
@@ -122,6 +124,8 @@ class ExplorationFramework:
 
         prev_insight_size = 0
         plateau_count = 0
+        # 上一层自评得到的"仍缺失的角度", 用于引导本层补充探索
+        missing_aspects: list[str] = []
 
         for layer in range(1, m + 1):
             logger.info("=== Exploration Layer %d/%d ===", layer, m)
@@ -140,6 +144,7 @@ class ExplorationFramework:
                     question_nodes=self._question_nodes,
                     insights=self._insight_bank.insights,
                     thesis=self._thesis,
+                    focus_aspects=missing_aspects,
                 )
                 questions = follow_ups + exploratory
                 question_categories = ["follow_up"] * len(follow_ups) + ["exploratory"] * len(exploratory)
@@ -294,9 +299,36 @@ class ExplorationFramework:
                 layer, self._insight_bank.size, len(self._question_nodes),
             )
 
-            # ── 早期停止检测 ──
+            # ── 停止决策 ──
             current_size = self._insight_bank.size
-            if early_stop_patience > 0 and layer > 1:
+            goal_check_on = getattr(self._config.exploration, "goal_sufficiency_check", False)
+
+            if goal_check_on:
+                # Goal 满足度自评驱动: agent 自己判断"够不够回答 goal"。
+                # 够了 → 提前停 (省 token); 不够 → 记录缺失角度引导下一层补探。
+                # max_layers (循环上界) 是唯一硬上限。
+                min_layers = getattr(self._config.exploration, "goal_sufficiency_min_layers", 2)
+                missing_aspects = []  # 重置; 仅保留本层最新的缺口
+                if layer >= min_layers and layer < m:
+                    verdict = self._goal_sufficiency.evaluate(
+                        goal=topic,
+                        insights=self._insight_bank.insights,
+                    )
+                    if verdict.sufficient:
+                        logger.info(
+                            "Goal-sufficiency: findings answer the goal — stopping early at layer %d",
+                            layer,
+                        )
+                        prev_insight_size = current_size
+                        self._question_logger.save()
+                        break
+                    missing_aspects = verdict.missing_aspects
+                    logger.info(
+                        "Goal-sufficiency: not yet — continuing with %d focus aspect(s)",
+                        len(missing_aspects),
+                    )
+            elif early_stop_patience > 0 and layer > 1:
+                # 回退: 机械 plateau 早停 (洞察库连续 N 层无增长)
                 if current_size <= prev_insight_size:
                     plateau_count += 1
                     logger.info(

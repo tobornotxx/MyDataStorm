@@ -127,6 +127,7 @@ class PlannerAgent:
         question_nodes: list[QuestionNode],
         insights: list[Insight],
         thesis: Thesis | None = None,
+        focus_aspects: list[str] | None = None,
     ) -> tuple[list[ExplorerQuestion], list[ExplorerQuestion]]:
         """基于完整问题树生成双模式问题 (树模式改进)。
 
@@ -140,6 +141,8 @@ class PlannerAgent:
             question_nodes: 完整的问题树节点列表
             insights: 当前全局洞察库
             thesis: 当前论点 (可能为 None)
+            focus_aspects: 上一层 goal 满足度自评指出的"仍缺失的角度",
+                用于优先引导本层补充探索 (可能为空)
 
         Returns:
             (follow_up_questions, exploratory_questions)
@@ -160,6 +163,7 @@ class PlannerAgent:
             global_insights=global_insights,
             thesis=thesis.title if thesis else None,
             research_strategy=thesis.research_strategy if thesis else None,
+            focus_aspects=focus_aspects or [],
         )
 
         response = self._llm.generate_json(prompt, temperature=0.7)

@@ -117,6 +117,13 @@ class ExplorationConfig:
     max_table_rows: int = 50
     # 早期停止: 连续 N 层洞察库未增长则停止 (0 = 禁用)
     early_stop_patience: int = 2
+    # Goal 满足度自评: 每层结束 agent 自评"发现是否已回答 goal"。
+    #   sufficient=True  → 提前停止 (省 token)
+    #   sufficient=False → 用反馈的缺失角度引导下一层补充探索
+    # max_layers 始终是硬上限。False = 禁用, 回退到机械 plateau 早停。
+    goal_sufficiency_check: bool = True
+    # 自评前的最小层数: 在此之前不评 (避免第 1 层信息太少就误判"够了")
+    goal_sufficiency_min_layers: int = 2
 
 
 @dataclass

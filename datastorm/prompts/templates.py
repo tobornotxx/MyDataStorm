@@ -160,6 +160,15 @@ Research strategy: {{ research_strategy }}
 Prioritize questions that help build, test, or refine this argument.
 Also ask questions that challenge or qualify the thesis - strong analysis addresses counter-arguments.
 {% endif %}
+{% if focus_aspects %}
+## Priority Gaps To Close This Round
+A self-assessment found the findings so far do NOT yet fully answer the goal.
+The following angles are still unexplored or under-investigated:
+{% for aspect in focus_aspects %}- {{ aspect }}
+{% endfor %}
+Prioritize questions that directly close these gaps. They are the most important
+questions to generate this round (while still serving the original goal).
+{% endif %}
 
 Output a JSON object with this structure:
 {
