@@ -346,14 +346,54 @@ class ExecutorAgent:
         return items
 
     def _parse_tuple_arg(self, args: str) -> list[str]:
-        """解析元组参数, 如 ("sql", "python")。"""
-        # 尝试匹配两个引号包裹的字符串
+        """解析元组参数, 如 ("sql", "python")。
+
+        LLM 以 Python 字符串字面量形式传入参数 (含 \\n、三引号等转义)。
+        必须正确还原这些转义, 否则 \\n 会作为字面反斜杠进入 exec(),
+        导致多行 Python 代码全挤在第 1 行而报 SyntaxError。
+
+        策略:
+          1. 优先用 ast.literal_eval 把整体当作 Python 元组字面量解析 —
+             这能正确处理 \\n、\\t、引号转义、三引号字符串等所有情况。
+          2. 失败再回退到正则匹配 + 手动还原常见转义。
+          3. 最后回退到按首个逗号分割。
+        """
+        import ast
+
+        args = args.strip()
+
+        # —— 优先: 作为 Python 元组/列表字面量解析 ——
+        for candidate in (args, f"({args})", f"[{args}]"):
+            try:
+                parsed = ast.literal_eval(candidate)
+            except Exception:
+                continue
+            if isinstance(parsed, (tuple, list)) and len(parsed) >= 2:
+                return [str(x) for x in parsed]
+
+        # —— 回退1: 正则抠出两个引号包裹的字符串, 再还原转义 ——
         matches = re.findall(r'"((?:[^"\\]|\\.)*)"', args)
         if len(matches) >= 2:
-            return matches
-        # 回退: 按逗号分割
+            return [self._unescape(m) for m in matches]
+
+        # —— 回退2: 按首个逗号分割 ——
         parts = args.split(",", 1)
-        return [p.strip().strip("'\"") for p in parts]
+        return [self._unescape(p.strip().strip("'\"")) for p in parts]
+
+    @staticmethod
+    def _unescape(s: str) -> str:
+        """还原常见转义序列 (仅用于正则回退路径; 主路径由 ast 处理)。"""
+        try:
+            # 用 unicode_escape 还原, 但先保护已有的真实 UTF-8 字符
+            return s.encode("latin-1", "backslashreplace").decode("unicode_escape")
+        except Exception:
+            return (
+                s.replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r")
+                .replace('\\"', '"')
+                .replace("\\'", "'")
+            )
 
     def _generate_answer_summary(self, question: str, action_history: list[str]) -> str:
         """根据执行历史生成自然语言答案摘要。"""

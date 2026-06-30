@@ -39,6 +39,8 @@ class DataSTORMPipeline:
 
     def __init__(self, config: DataSTORMConfig) -> None:
         self._config = config
+        # 完整探索树节点 (run 后填充; adapter 用它提取原始发现)
+        self.last_exploration_nodes = []
 
         # 初始化组件
         self._llm = LLMClient(config.llm)
@@ -99,6 +101,11 @@ class DataSTORMPipeline:
             topic=query,
             warmstart_report=warmstart_report,
         )
+
+        # 暴露完整探索树节点 (未经 InsightBank 过滤的全部发现)。
+        # 评分/提取 insight 时优先使用这些原始发现,
+        # 绕开 InsightBank 过滤 + 报告生成 + condense 造成的信息损耗。
+        self.last_exploration_nodes = exploration.question_nodes
 
         # 如果探索未能生成论点, 创建一个默认的
         if final_thesis is None:
