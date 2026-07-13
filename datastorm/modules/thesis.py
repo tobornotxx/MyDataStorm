@@ -56,7 +56,7 @@ class ThesisModule:
             context=context,
         )
 
-        result = self._llm.generate_json(prompt, temperature=0.7)
+        result = self._llm.generate_json(prompt, scenario="thesis", temperature=0.7)
 
         # 解析论点候选
         theses = result.get("theses", result.get("thesis_candidates", []))
@@ -118,7 +118,7 @@ class ThesisModule:
             context=context,
         )
 
-        result = self._llm.generate_json(prompt, temperature=0.5)
+        result = self._llm.generate_json(prompt, scenario="thesis", temperature=0.5)
 
         refined = Thesis(
             title=result.get("thesis", result.get("title", current_thesis.title)),

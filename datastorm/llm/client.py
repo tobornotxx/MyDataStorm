@@ -16,24 +16,40 @@ from typing import Any
 
 from openai import OpenAI
 
-from datastorm.config import LLMConfig
+from datastorm.config import LLMConfig, ScenarioConfig
 
 logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """OpenAI LLM 客户端封装。"""
+    """OpenAI LLM 客户端封装。
+
+    支持按「场景 (scenario)」调用不同模型/端点: 每个场景在 ``llm_config.json``
+    的 ``scenarios`` 字段里可单独配置 model_name / api_base / api_key 等。
+    内部按 ``(api_base, api_key)`` 缓存多个 OpenAI 客户端, 调用时根据场景选用。
+    """
 
     def __init__(self, config: LLMConfig) -> None:
         self._config = config
-        kwargs = {"api_key": config.api_key}
-        if config.api_base:
-            kwargs["base_url"] = config.api_base
-        self._client = OpenAI(**kwargs)
+        # (api_base, api_key) → OpenAI 客户端缓存, 避免重复构造
+        self._clients: dict[tuple[str, str], OpenAI] = {}
+
+    def _get_client(self, api_base: str, api_key: str) -> OpenAI:
+        """按 (api_base, api_key) 复用 OpenAI 客户端。"""
+        cache_key = (api_base or "", api_key or "")
+        client = self._clients.get(cache_key)
+        if client is None:
+            kwargs: dict[str, Any] = {"api_key": api_key}
+            if api_base:
+                kwargs["base_url"] = api_base
+            client = OpenAI(**kwargs)
+            self._clients[cache_key] = client
+        return client
 
     def generate(
         self,
         prompt: str,
+        scenario: str = "default",
         model: str | None = None,
         system_prompt: str | None = None,
         temperature: float | None = None,
@@ -45,19 +61,24 @@ class LLMClient:
 
         Args:
             prompt: 用户 prompt
-            model: 模型名称, 默认使用 exploration_model
+            scenario: 场景名, 决定使用的 model/api_base/api_key 及默认 temperature/
+                max_completion_tokens。在 ``llm_config.json`` 的 ``scenarios`` 中配置,
+                未配置的字段继承 ``default``。
+            model: 显式模型名, 覆盖该场景的 model_name
             system_prompt: 系统 prompt
-            temperature: 温度
-            max_completion_tokens: 最大 token 数
+            temperature: 温度, 覆盖该场景默认值
+            max_completion_tokens: 最大 token 数, 覆盖该场景默认值
             json_mode: 是否要求 JSON 输出
             max_retries: 最大重试次数
 
         Returns:
             生成的文本
         """
-        model = model or self._config.exploration_model
-        temperature = temperature if temperature is not None else self._config.temperature
-        max_completion_tokens = max_completion_tokens or self._config.max_completion_tokens
+        sc: ScenarioConfig = self._config.scenario(scenario)
+        model = model or sc.model_name
+        temperature = temperature if temperature is not None else sc.temperature
+        max_completion_tokens = max_completion_tokens or sc.max_completion_tokens
+        client = self._get_client(sc.api_base, sc.api_key)
 
         messages: list[dict[str, str]] = []
         if system_prompt:
@@ -90,7 +111,7 @@ class LLMClient:
 
         for attempt in range(max_retries):
             try:
-                response = self._client.chat.completions.create(**kwargs)
+                response = client.chat.completions.create(**kwargs)
                 content = response.choices[0].message.content or ""
                 usage = response.usage
                 logger.debug(
@@ -113,6 +134,7 @@ class LLMClient:
     def generate_json(
         self,
         prompt: str,
+        scenario: str = "default",
         model: str | None = None,
         system_prompt: str | None = None,
         temperature: float | None = None,
@@ -121,11 +143,21 @@ class LLMClient:
     ) -> dict[str, Any]:
         """生成 JSON 输出。
 
+        Args:
+            prompt: 用户 prompt
+            scenario: 场景名 (见 :meth:`generate`)
+            model: 显式模型名, 覆盖该场景的 model_name
+            system_prompt: 系统 prompt
+            temperature: 温度, 覆盖该场景默认值
+            max_completion_tokens: 最大 token 数, 覆盖该场景默认值
+            max_retries: 最大重试次数
+
         Returns:
             解析后的 JSON 字典
         """
         text = self.generate(
             prompt=prompt,
+            scenario=scenario,
             model=model,
             system_prompt=system_prompt,
             temperature=temperature,

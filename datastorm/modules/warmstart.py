@@ -105,14 +105,14 @@ class WarmStartModule:
             topic=topic,
             search_results=combined_results[:8000],
         )
-        report = self._llm.generate(synthesis_prompt, max_completion_tokens=2048)
+        report = self._llm.generate(synthesis_prompt, scenario="warmstart", max_completion_tokens=2048)
 
         # 3. 提取洞察 B₀
         insights_prompt = _WARMSTART_INSIGHTS_PROMPT.format(
             topic=topic,
             report=report,
         )
-        insights_data = self._llm.generate_json(insights_prompt)
+        insights_data = self._llm.generate_json(insights_prompt, scenario="warmstart")
         insights = []
         for item in insights_data.get("insights", []):
             insights.append(
@@ -141,7 +141,7 @@ class WarmStartModule:
             f"Generate 3-5 diverse web search queries to research the following topic from "
             f"different angles. Output one query per line.\n\nTopic: {topic}"
         )
-        response = self._llm.generate(prompt, temperature=0.7)
+        response = self._llm.generate(prompt, scenario="warmstart", temperature=0.7)
         queries = [
             line.strip().lstrip("0123456789.-) ")
             for line in response.strip().split("\n")

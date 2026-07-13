@@ -109,7 +109,7 @@ class QueryConsistencyModule:
             input=json.dumps(input_data, indent=2),
         )
 
-        result = self._llm.generate_json(prompt, temperature=0.0)
+        result = self._llm.generate_json(prompt, scenario="consistency", temperature=0.0)
 
         # 解析结果
         follow_ups = []

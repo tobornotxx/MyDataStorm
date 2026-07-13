@@ -82,7 +82,7 @@ class DataSTORMEvaluator:
             reference_article=reference_article,
         )
 
-        result = self._llm.generate_json(prompt, temperature=0.0)
+        result = self._llm.generate_json(prompt, scenario="evaluation", temperature=0.0)
         criteria = []
         for c in result.get("criteria", []):
             criteria.append(
@@ -113,7 +113,7 @@ class DataSTORMEvaluator:
             generated_article=generated_article,
         )
 
-        result = self._llm.generate_json(prompt, temperature=0.0)
+        result = self._llm.generate_json(prompt, scenario="evaluation", temperature=0.0)
         scores = []
         for s in result.get("criterion_scores", []):
             scores.append(
@@ -145,7 +145,7 @@ class DataSTORMEvaluator:
     def atomic_breakdown(self, article: str) -> list[str]:
         """将文章分解为原子洞察 (Prompt 19, Table 19)。"""
         prompt = renderer.render(templates.ATOMIC_BREAKDOWN, article=article)
-        response = self._llm.generate(prompt, temperature=0.0)
+        response = self._llm.generate(prompt, scenario="evaluation", temperature=0.0)
 
         insights = []
         for line in response.split("\n"):
@@ -179,7 +179,7 @@ class DataSTORMEvaluator:
                 f"Generated article insights:\n{json.dumps(generated_insights, indent=2)}\n\n"
                 f"Return JSON: {{\"covered\": true/false, \"matched_insight\": \"...\"}}"
             )
-            result = self._llm.generate_json(prompt, temperature=0.0)
+            result = self._llm.generate_json(prompt, scenario="evaluation", temperature=0.0)
             if result.get("covered", False):
                 covered.append({"reference": ref, "matched": result.get("matched_insight", "")})
 
@@ -208,7 +208,7 @@ class DataSTORMEvaluator:
         )
         prompt += "\n\nReturn JSON: {\"is_acled_derived\": true/false, \"explanation\": \"...\"}"
 
-        return self._llm.generate_json(prompt, temperature=0.0)
+        return self._llm.generate_json(prompt, scenario="evaluation", temperature=0.0)
 
     def compute_acled_attribution_rate(
         self,
@@ -242,7 +242,7 @@ class DataSTORMEvaluator:
             answer=answer,
             gt_answer=gt_answer,
         )
-        response = self._llm.generate(prompt, temperature=0.0, max_completion_tokens=64)
+        response = self._llm.generate(prompt, scenario="evaluation", temperature=0.0, max_completion_tokens=64)
 
         match = re.search(r"<rating>(\d+)</rating>", response)
         if match:
@@ -257,4 +257,4 @@ class DataSTORMEvaluator:
             templates.INSIGHTBENCH_SUMMARY,
             insights="\n".join(f"- {i}" for i in insights),
         )
-        return self._llm.generate(prompt, temperature=0.3)
+        return self._llm.generate(prompt, scenario="evaluation", temperature=0.3)

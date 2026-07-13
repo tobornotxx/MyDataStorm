@@ -158,7 +158,7 @@ class ReportGenerator:
             f"Thesis: {thesis.title}\n\n"
             f"Return JSON with: title, subtitle, editorial_angle"
         )
-        result = self._llm.generate_json(prompt, temperature=0.7)
+        result = self._llm.generate_json(prompt, scenario="report", temperature=0.7)
         return {
             "title": result.get("title", topic),
             "subtitle": result.get("subtitle", thesis.title),
@@ -186,7 +186,7 @@ class ReportGenerator:
         )
 
         result = self._llm.generate_json(
-            prompt, model=self._config.llm.report_model, temperature=0.5
+            prompt, scenario="report", temperature=0.5
         )
 
         outline = ReportOutline(
@@ -240,7 +240,7 @@ class ReportGenerator:
         )
 
         result = self._llm.generate_json(
-            prompt, model=self._config.llm.report_model, max_completion_tokens=4096
+            prompt, scenario="report", max_completion_tokens=4096
         )
 
         return DraftedSection(
@@ -278,7 +278,7 @@ class ReportGenerator:
             )
 
             result = self._llm.generate_json(
-                prompt, model=self._config.llm.report_model, temperature=0.0
+                prompt, scenario="report", temperature=0.0
             )
 
             checks.append(
@@ -331,7 +331,7 @@ class ReportGenerator:
         )
 
         result = self._llm.generate_json(
-            prompt, model=self._config.llm.report_model, max_completion_tokens=4096
+            prompt, scenario="report", max_completion_tokens=4096
         )
 
         return DraftedSection(
@@ -387,7 +387,7 @@ class ReportGenerator:
         )
 
         result = self._llm.generate_json(
-            prompt, model=self._config.llm.report_model, max_completion_tokens=8192
+            prompt, scenario="report", max_completion_tokens=8192
         )
 
         # 构建参考文献

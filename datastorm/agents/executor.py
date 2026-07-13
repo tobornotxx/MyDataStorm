@@ -102,7 +102,7 @@ class ExecutorAgent:
             # 调用 LLM 获取 Thought + Action
             response = self._llm.generate(
                 prompt,
-                model=self._config.llm.exploration_model,
+                scenario="executor",
                 temperature=0.0,
             )
 
@@ -404,7 +404,7 @@ class ExecutorAgent:
             f"Provide a concise natural language answer summarizing the key findings. "
             f"Include specific numbers and patterns discovered."
         )
-        return self._llm.generate(prompt, temperature=0.3, max_completion_tokens=1024)
+        return self._llm.generate(prompt, scenario="executor", temperature=0.3, max_completion_tokens=1024)
 
     def reset_history(self) -> None:
         """重置对话历史。"""

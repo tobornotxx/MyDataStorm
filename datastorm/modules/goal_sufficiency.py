@@ -69,6 +69,13 @@ class GoalSufficiencyModule:
             "(e.g. if the goal mentions a trend, was change-over-time examined; if it "
             "mentions a specific subgroup or time window, was that subgroup/window "
             "actually located and analyzed rather than assumed)?\n"
+            "- DIMENSION DECOMPOSITION: for any quantity, trend, or comparison the goal "
+            "asks about, check whether it has been examined ACROSS each available "
+            "analytical dimension — time (change-over-time), category, agent/owner, and "
+            "priority/group — NOT just as a single overall number. An overall trend or "
+            "imbalance may exist in ONE subgroup while being absent or reversed in "
+            "others; 'X overall' is NOT the same as 'X for every subgroup'. Any "
+            "(entity x dimension) slice left unexamined is a missing aspect.\n"
             "- Are there obvious follow-up questions a careful analyst would still ask "
             "before concluding?\n\n"
             "Respond in JSON:\n"
@@ -77,13 +84,18 @@ class GoalSufficiencyModule:
             '  "reasoning": "<one or two sentences>",\n'
             '  "missing_aspects": ["<specific angle still unexplored>", ...]\n'
             "}\n"
-            "Set sufficient=true ONLY if the findings genuinely cover the goal. "
-            "If unsure, set false and list what is missing. "
-            "When sufficient=true, missing_aspects should be empty."
+            "ANTI-PREMATURE-STOP: before setting sufficient=true, actively try to name "
+            "at least two analytical slices (entity x dimension, e.g. 'trend per "
+            "category', 'TTR per agent over time', 'volume per priority') that have NOT "
+            "yet been examined. If you can name ANY goal-relevant unexamined slice, set "
+            "sufficient=false and put those slices in missing_aspects. Set "
+            "sufficient=true ONLY if you genuinely cannot think of any unexamined "
+            "goal-relevant slice. If unsure, set false. When sufficient=true, "
+            "missing_aspects must be empty."
         )
 
         try:
-            result = self._llm.generate_json(prompt, temperature=0.3)
+            result = self._llm.generate_json(prompt, scenario="goal_sufficiency", temperature=0.3)
         except Exception as e:
             logger.warning("Goal-sufficiency eval failed (%s); defaulting to continue", e)
             return SufficiencyVerdict(sufficient=False, missing_aspects=[], reasoning="eval error")

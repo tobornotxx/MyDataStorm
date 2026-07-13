@@ -1,7 +1,29 @@
 {
-    "api_base": "https://api.openai.com/v1",
-    "api_key": "sk-your-api-key-here",
-    "model_name": "gpt-5.4-mini",
-    "temperature": 0.7,
-    "max_completion_tokens": 4096
+    "default": {
+        "api_base": "https://api.openai.com/v1",
+        "api_key": "sk-your-api-key-here",
+        "model_name": "gpt-5.4-mini",
+        "temperature": 0.7,
+        "max_completion_tokens": 4096
+    },
+    "scenarios": {
+        "warmstart": {},
+        "planner": {},
+        "executor": {
+            "model_name": "gpt-5.4",
+            "api_base": "https://api.openai.com/v1",
+            "api_key": "sk-strong-model-key",
+            "temperature": 0.0,
+            "max_completion_tokens": 8192
+        },
+        "thesis": {},
+        "insight_bank": {},
+        "consistency": {},
+        "goal_sufficiency": {},
+        "report": {
+            "model_name": "gpt-5.4",
+            "max_completion_tokens": 8192
+        },
+        "evaluation": {}
+    }
 }

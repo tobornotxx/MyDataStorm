@@ -101,7 +101,7 @@ class InsightBank:
             input=json.dumps(candidate_input, indent=2),
         )
 
-        result = self._llm.generate_json(prompt, temperature=0.3)
+        result = self._llm.generate_json(prompt, scenario="insight_bank", temperature=0.3)
 
         # 更新洞察库
         selected_insights = []

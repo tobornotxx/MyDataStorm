@@ -61,7 +61,7 @@ class PlannerAgent:
         )
 
         # 使用 json_mode 强制结构化输出
-        response = self._llm.generate_json(prompt, temperature=0.7)
+        response = self._llm.generate_json(prompt, scenario="planner", temperature=0.7)
         questions = self._parse_exploration_questions(response)
         # 安全截断：保证不超过 max_q（即使 LLM 返回更多）
         if len(questions) > max_q:
@@ -109,7 +109,7 @@ class PlannerAgent:
             research_strategy=thesis.research_strategy if thesis else None,
         )
 
-        response = self._llm.generate_json(prompt, temperature=0.7)
+        response = self._llm.generate_json(prompt, scenario="planner", temperature=0.7)
         questions = self._parse_exploration_questions(response)
         # 安全截断：保证不超过 max_q（即使 LLM 返回更多）
         if len(questions) > max_q:
@@ -166,7 +166,7 @@ class PlannerAgent:
             focus_aspects=focus_aspects or [],
         )
 
-        response = self._llm.generate_json(prompt, temperature=0.7)
+        response = self._llm.generate_json(prompt, scenario="planner", temperature=0.7)
 
         follow_ups = self._parse_tree_questions(
             response.get("follow_up_questions", []),
