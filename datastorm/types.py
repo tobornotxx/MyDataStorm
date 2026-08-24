@@ -72,6 +72,9 @@ class QuestionNode:
     summary_stats: list["SummaryStatistics"] = field(default_factory=list)
     raw_results: Any = None
     row_count: int = 0
+    # 规则判定的产出质量: "productive" | "sparse" | "empty" | "failed" | ""
+    # 用于把「哪些问题是哑弹」反馈给下一层 planner，避免重复走死路。
+    outcome: str = ""
 
 
 @dataclass

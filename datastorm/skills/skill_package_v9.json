@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "version": "v9-draft",
+    "source_benchmark": "InsightBench",
+    "produced_by": "manual-refactor-from-v8-hardcoded-guidance",
+    "purity_audit": "pending",
+    "frozen": false,
+    "note": "由 v8 硬编码引导重构而来。所有 skill 必须数据无关：不得出现具体列名/列值/领域术语。需要具体列名时用 {placeholder} 占位符，运行时由 SkillPackage.render() 从实际 schema 填充。"
+  },
+
+  "skills": [
+    {
+      "id": "decompose-trend-by-category",
+      "trigger": "question concerns TREND / GROWTH / CHANGE OVER TIME",
+      "action": "Do not test it only on the overall total. Also decompose the trend by the primary categorical columns of this dataset ({categorical_columns}) and report per-group trends. A trend may appear in ONE subgroup while being absent overall, or vice versa.",
+      "rationale": "An aggregate trend can mask or invert subgroup-level behaviour.",
+      "provenance": "v8 _ANALYTICAL_GUIDANCE (trend clause); fixed flag-4 GT4 (0.1->1.0), flag-6 GT2 (0.3->1.0)",
+      "purity": "generalized — column names come from runtime schema via {categorical_columns}, none hardcoded",
+      "validated": {
+        "cases": ["flag-4", "flag-6"],
+        "note": "v8 前后对比确认为判官无关的真实覆盖修复；on/off delta 待 mini-eval 补测"
+      }
+    },
+    {
+      "id": "decompose-imbalance-by-group",
+      "trigger": "question concerns an IMBALANCE / DISTRIBUTION / CONCENTRATION",
+      "action": "Check whether it holds uniformly across time and across the categorical groups of this dataset ({categorical_columns}), or whether it concentrates in one subgroup or one period. Report both the overall result and any notable per-group deviation; do not stop at the aggregate.",
+      "rationale": "A distribution stated only in aggregate hides where the imbalance actually lives.",
+      "provenance": "v8 _ANALYTICAL_GUIDANCE (imbalance clause)",
+      "purity": "generalized — column names from runtime schema",
+      "validated": {"cases": [], "note": "待 mini-eval 补测"}
+    },
+    {
+      "id": "pick-adequate-time-bucket",
+      "trigger": "aggregating or testing a trend over a time column",
+      "action": "Choose an aggregation granularity that leaves enough observations per bucket to be meaningful. Consult the per-column time range and bucket counts provided in the schema context before picking a granularity; do not test trends on a granularity so fine that most buckets are near-empty.",
+      "rationale": "Trend tests on sparse buckets produce noise rather than signal.",
+      "provenance": "v8 _temporal_profile (adaptive granularity profiling)",
+      "purity": "clean — purely structural, references no dataset content",
+      "validated": {"cases": [], "note": "已随 v8 温启用，未单独 ablate"}
+    },
+    {
+      "id": "coverage-multidim-selfcheck",
+      "trigger": "self-evaluating whether the findings so far answer the research goal",
+      "action": "For any quantity, trend, or comparison the goal asks about, check whether it has been examined ACROSS each analytical dimension available in this dataset — over time, and broken down by each of its categorical dimensions ({categorical_columns}) — NOT just as a single overall number. An overall trend or imbalance may exist in ONE subgroup while being absent or reversed in others; 'X overall' is NOT the same as 'X for every subgroup'. Any (entity x dimension) slice left unexamined is a missing aspect.",
+      "rationale": "Coverage failures are dominated by unexamined entity-by-dimension slices, not by missing headline numbers.",
+      "provenance": "v8 goal_sufficiency DIMENSION DECOMPOSITION clause",
+      "purity": "generalized — v8 原文硬编码了 'time, category, agent/owner, priority/group' 四个 ServiceNow 维度名，现改为从 runtime schema 注入",
+      "validated": {
+        "cases": ["flag-4", "flag-6"],
+        "note": "与 decompose-trend-by-category 协同生效"
+      }
+    },
+    {
+      "id": "anti-premature-stop",
+      "trigger": "about to declare the research goal sufficiently answered",
+      "action": "Before setting sufficient=true, actively try to name at least two analytical slices (entity x dimension — e.g. a metric per categorical group, a metric per group over time) that have NOT yet been examined. If you can name ANY goal-relevant unexamined slice, set sufficient=false and put those slices in missing_aspects. Set sufficient=true ONLY if you genuinely cannot think of any unexamined goal-relevant slice. If unsure, set false.",
+      "rationale": "The self-evaluator's default failure mode is stopping too early, not too late.",
+      "provenance": "v8 goal_sufficiency ANTI-PREMATURE-STOP clause",
+      "purity": "generalized — v8 原文举例含 ITSM 专有术语 'TTR per agent over time'，已改为通用措辞",
+      "validated": {"cases": [], "note": "待 ablation 单独验证"}
+    },
+    {
+      "id": "prefer-productive-followups",
+      "trigger": "planning the next layer of questions after a previous layer has run",
+      "action": "Review which previously asked questions produced substantive findings and which returned nothing usable (execution errors, empty result sets, or results too sparse to interpret). Do not re-ask questions along a line of inquiry that already came back empty; redirect that effort toward slices that have not been probed yet.",
+      "rationale": "Without outcome feedback the planner re-spends budget on lines of inquiry already known to be dead.",
+      "provenance": "new in v9 — 档2 轨迹反馈（导师的经验回放方向，run 内层级）",
+      "purity": "clean — refers to execution outcomes, not dataset content",
+      "validated": {"cases": [], "note": "新增，待 ablation 验证"}
+    }
+  ],
+
+  "episodes": [],
+
+  "config": {
+    "max_layers": 3,
+    "questions_per_layer": 2,
+    "summary_samples": 3
+  }
+}

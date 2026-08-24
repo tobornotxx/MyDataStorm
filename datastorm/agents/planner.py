@@ -128,6 +128,7 @@ class PlannerAgent:
         insights: list[Insight],
         thesis: Thesis | None = None,
         focus_aspects: list[str] | None = None,
+        unproductive_questions: list[str] | None = None,
     ) -> tuple[list[ExplorerQuestion], list[ExplorerQuestion]]:
         """基于完整问题树生成双模式问题 (树模式改进)。
 
@@ -143,6 +144,9 @@ class PlannerAgent:
             thesis: 当前论点 (可能为 None)
             focus_aspects: 上一层 goal 满足度自评指出的"仍缺失的角度",
                 用于优先引导本层补充探索 (可能为空)
+            unproductive_questions: 上一层执行后无产出的问题 (执行失败或空结果),
+                由规则判定。用于让本层避开已知死路, 与 focus_aspects 构成
+                「正面引导 + 负面避让」一对。
 
         Returns:
             (follow_up_questions, exploratory_questions)
@@ -164,6 +168,7 @@ class PlannerAgent:
             thesis=thesis.title if thesis else None,
             research_strategy=thesis.research_strategy if thesis else None,
             focus_aspects=focus_aspects or [],
+            unproductive_questions=unproductive_questions or [],
         )
 
         response = self._llm.generate_json(prompt, scenario="planner", temperature=0.7)

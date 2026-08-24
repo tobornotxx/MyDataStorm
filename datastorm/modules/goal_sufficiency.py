@@ -21,9 +21,23 @@ from dataclasses import dataclass, field
 
 from datastorm.config import DataSTORMConfig
 from datastorm.llm.client import LLMClient
+from datastorm.skills import describe_categorical_columns, get_skill_package
 from datastorm.types import Insight
 
 logger = logging.getLogger(__name__)
+
+# 本模块消费的 skill（顺序即注入顺序）。
+# v8 曾把这两段引导硬编码在 prompt 里，其中：
+#   - DIMENSION DECOMPOSITION 写死了 "time, category, agent/owner, priority/group"
+#     —— 后三个是 ServiceNow 工单维度名；
+#   - ANTI-PREMATURE-STOP 的举例含 "TTR per agent over time"
+#     —— TTR (time-to-resolution) 是 ITSM 专有术语。
+# 两者都会把自评器往工单场景上带，迁移到其他领域时失效。现改为从 skill 包
+# 加载，维度名在运行时由当前数据集的真实分类列注入。
+_SUFFICIENCY_SKILL_IDS = [
+    "coverage-multidim-selfcheck",
+    "anti-premature-stop",
+]
 
 
 @dataclass
@@ -42,12 +56,33 @@ class GoalSufficiencyModule:
         self._llm = llm
         self._config = config
 
-    def evaluate(self, goal: str, insights: list[Insight]) -> SufficiencyVerdict:
+    def _render_skill_guidance(self, grouping_columns: list[str] | None) -> str:
+        """从 skill 包渲染自评引导，维度名用本数据集的真实分类列填充。"""
+        try:
+            pkg = get_skill_package()
+            return pkg.render_guidance(
+                _SUFFICIENCY_SKILL_IDS,
+                header="COVERAGE AUDIT RULES",
+                categorical_columns=describe_categorical_columns(grouping_columns or []),
+            )
+        except Exception as e:
+            logger.warning("Sufficiency skill render failed (%s) — continuing without", e)
+            return ""
+
+    def evaluate(
+        self,
+        goal: str,
+        insights: list[Insight],
+        grouping_columns: list[str] | None = None,
+    ) -> SufficiencyVerdict:
         """评估当前发现是否足以回答 goal。
 
         Args:
             goal: 研究目标 (即 topic / 用户查询)
             insights: 截至当前层的全局洞察库
+            grouping_columns: 本数据集适合做分组轴的分类列名。用于把
+                「按维度分解」的引导具体化到真实列名；为 None 时退回
+                数据无关的通用措辞。
 
         Returns:
             SufficiencyVerdict(sufficient, missing_aspects, reasoning)
@@ -69,29 +104,16 @@ class GoalSufficiencyModule:
             "(e.g. if the goal mentions a trend, was change-over-time examined; if it "
             "mentions a specific subgroup or time window, was that subgroup/window "
             "actually located and analyzed rather than assumed)?\n"
-            "- DIMENSION DECOMPOSITION: for any quantity, trend, or comparison the goal "
-            "asks about, check whether it has been examined ACROSS each available "
-            "analytical dimension — time (change-over-time), category, agent/owner, and "
-            "priority/group — NOT just as a single overall number. An overall trend or "
-            "imbalance may exist in ONE subgroup while being absent or reversed in "
-            "others; 'X overall' is NOT the same as 'X for every subgroup'. Any "
-            "(entity x dimension) slice left unexamined is a missing aspect.\n"
             "- Are there obvious follow-up questions a careful analyst would still ask "
-            "before concluding?\n\n"
+            "before concluding?\n"
+            f"{self._render_skill_guidance(grouping_columns)}\n\n"
             "Respond in JSON:\n"
             "{\n"
             '  "sufficient": true | false,\n'
             '  "reasoning": "<one or two sentences>",\n'
             '  "missing_aspects": ["<specific angle still unexplored>", ...]\n'
             "}\n"
-            "ANTI-PREMATURE-STOP: before setting sufficient=true, actively try to name "
-            "at least two analytical slices (entity x dimension, e.g. 'trend per "
-            "category', 'TTR per agent over time', 'volume per priority') that have NOT "
-            "yet been examined. If you can name ANY goal-relevant unexamined slice, set "
-            "sufficient=false and put those slices in missing_aspects. Set "
-            "sufficient=true ONLY if you genuinely cannot think of any unexamined "
-            "goal-relevant slice. If unsure, set false. When sufficient=true, "
-            "missing_aspects must be empty."
+            "When sufficient=true, missing_aspects must be empty."
         )
 
         try:

@@ -169,6 +169,18 @@ The following angles are still unexplored or under-investigated:
 Prioritize questions that directly close these gaps. They are the most important
 questions to generate this round (while still serving the original goal).
 {% endif %}
+{% if unproductive_questions %}
+## Lines Of Inquiry That Came Back Empty
+These questions were already executed and returned nothing usable (execution error,
+or an empty/degenerate result set):
+{% for q in unproductive_questions %}- {{ q }}
+{% endfor %}
+Do NOT re-ask these, or minor rewordings of them along the same line of inquiry.
+If such a slice is genuinely important, reformulate it differently (a different
+grouping column, a coarser time granularity, or a simpler aggregation) rather than
+repeating the same formulation. Otherwise redirect that effort toward slices that
+have not been probed yet.
+{% endif %}
 
 Output a JSON object with this structure:
 {
