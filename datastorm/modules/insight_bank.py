@@ -75,11 +75,17 @@ class InsightBank:
 
         # 新洞察 (从响应中提取)
         for resp in new_responses:
-            if resp.summary_text:
+            # 用 answer 而非 summary_text: summary_text = answer + 原始统计块
+            # (distinct_percentage / top_values / min / max / mean 等)。这些统计是
+            # answer 已表述过内容的低质量重复 —— executor 在答案里已经写过
+            # "平均每月 38.5 件、区间 26-46", 再附一遍原始数字对 insight 去重/择优
+            # 没有帮助, 只占 token。结构化统计仍保留在 resp.summary_stats 字段。
+            content = (resp.answer or "").strip()
+            if content:
                 insight_id = f"new_{uuid.uuid4().hex[:8]}"
                 candidate_input[insight_id] = (
                     f"Question: {resp.question}\n"
-                    f"Answer: {resp.summary_text}"
+                    f"Answer: {content}"
                 )
                 new_id_to_response[insight_id] = resp
 
