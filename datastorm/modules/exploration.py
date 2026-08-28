@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from datastorm.agents.executor import ExecutorAgent
@@ -106,39 +105,6 @@ class ExplorationFramework:
         """
         return list(getattr(self._executor._db, "_grouping_columns", []) or [])
 
-    @staticmethod
-    def _classify_outcome(resp: ExecutorResponse) -> str:
-        """用规则（非 LLM）判定一次执行的产出质量。
-
-        档 2「run 内轨迹反馈」：把上一层哪些问题有产出、哪些是哑弹反馈给
-        下一层 planner。刻意不用 LLM —— 执行失败/空结果/结果过稀疏都能由
-        规则准确判定，多一次 LLM 调用没有收益。
-
-        Returns: "productive" | "empty" | "failed" | "sparse"
-        """
-        answer = (resp.answer or "").strip()
-        if not answer or answer.lower().startswith("execution failed"):
-            return "failed"
-        if "SQL Error" in answer or "Python execution error" in answer:
-            return "failed"
-        row_count = getattr(resp, "row_count", None)
-        if row_count == 0:
-            return "empty"
-        if isinstance(row_count, int) and 0 < row_count < 2:
-            # 单行结果多为退化聚合（例如只取到一个总计），信息量有限
-            return "sparse"
-        return "productive"
-
-    def _build_outcome_feedback(self, nodes: list[QuestionNode]) -> list[str]:
-        """把无产出的问题整理成给下一层 planner 的负面线索。"""
-        dead: list[str] = []
-        for node in nodes:
-            if node.outcome in ("failed", "empty"):
-                q = (node.question or "").strip()
-                if q:
-                    dead.append(f"{q} [{node.outcome}]")
-        return dead
-
     def set_output_dir(self, output_dir: str) -> None:
         """设置输出目录 (用于日志保存)。"""
         self._question_logger.set_output_dir(output_dir)
@@ -168,8 +134,6 @@ class ExplorationFramework:
         plateau_count = 0
         # 上一层自评得到的"仍缺失的角度", 用于引导本层补充探索
         missing_aspects: list[str] = []
-        # 上一层执行后无产出的问题 (规则判定), 用于让本层避开死路（档 2）
-        unproductive_questions: list[str] = []
 
         for layer in range(1, m + 1):
             logger.info("=== Exploration Layer %d/%d ===", layer, m)
@@ -189,7 +153,6 @@ class ExplorationFramework:
                     insights=self._insight_bank.insights,
                     thesis=self._thesis,
                     focus_aspects=missing_aspects,
-                    unproductive_questions=unproductive_questions,
                 )
                 questions = follow_ups + exploratory
                 question_categories = ["follow_up"] * len(follow_ups) + ["exploratory"] * len(exploratory)
@@ -322,8 +285,6 @@ class ExplorationFramework:
                 node.summary_stats = resp.summary_stats
                 node.raw_results = resp.raw_results
                 node.row_count = resp.row_count
-                # 规则判定产出质量，供下一层 planner 避开已知死路（档 2）
-                node.outcome = self._classify_outcome(resp)
                 self._question_nodes.append(node)
 
             # 记录到日志
@@ -345,21 +306,6 @@ class ExplorationFramework:
                 "Layer %d: Insight bank size: %d, Question tree nodes: %d",
                 layer, self._insight_bank.size, len(self._question_nodes),
             )
-
-            # ── 轨迹反馈（档 2）：统计本层产出质量，供下一层 planner 参考 ──
-            layer_db_nodes = [nodes_by_idx[idx] for idx, _ in db_questions_with_idx]
-            unproductive_questions = self._build_outcome_feedback(layer_db_nodes)
-            if layer_db_nodes:
-                dist = Counter(n.outcome for n in layer_db_nodes)
-                logger.info(
-                    "Layer %d outcome mix: %s",
-                    layer, ", ".join(f"{k}={v}" for k, v in sorted(dist.items())),
-                )
-                if unproductive_questions:
-                    logger.info(
-                        "Layer %d: %d unproductive question(s) will be fed back to planner",
-                        layer, len(unproductive_questions),
-                    )
 
             # ── 停止决策 ──
             current_size = self._insight_bank.size
