@@ -2,6 +2,22 @@
 
 基于论文 "DataSTORM: Deep Research on Large-Scale Databases using Exploratory Data Analysis and Data Storytelling" 的复现实现。
 
+> ## 📌 接手者先读这个
+>
+> **本 repo 已不是主力实现。** agent 主体已迁移到 pi harness 上的
+> TypeScript 实现，位于姊妹 repo
+> [`IndustryAnalysisGenerationLLM`](https://github.com/tobornotxx/IndustryAnalysisGenerationLLM)
+> 的 `pi-agent/`（分支 `pi-migration`）。
+>
+> **完整交接文档**：该 repo 的 `handover/HANDOVER.md` —— 项目目标、架构对比、
+> 实验结果分析、近/中/远期规划、走过的弯路，都在那里。
+>
+> 本 repo 目前仍然是**两样东西的唯一来源**，不要在别处另建副本：
+> - `datastorm/prompts/templates.py` —— 所有 prompt 的源头（pi 版逐字移植自此）
+> - `datastorm/skills/skill_package_v9.json` —— skill 包（pi 版直接读它）
+>
+> 两个 repo 默认**并列 clone 在同一父目录**下。
+
 ## 架构概览
 
 ```
